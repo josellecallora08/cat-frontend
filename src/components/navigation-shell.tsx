@@ -1,8 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
+import catsLogo from "@/assets/CATS-SIDEBAR-LOGO.png";
 
 const navItems = [
   { href: "/", label: "Scenarios", icon: "📋" },
@@ -17,11 +19,13 @@ export function NavigationShell({ children }: { children: React.ReactNode }) {
     <div className="flex h-full min-h-screen">
       {/* Sidebar */}
       <aside className="w-64 border-r border-border bg-card flex flex-col">
-        <div className="p-6 border-b border-border">
-          <h1 className="text-xl font-bold text-foreground">CAT</h1>
-          <p className="text-sm text-muted-foreground">
-            Collection Agent Trainer
-          </p>
+        <div className="p-8 border-b border-border flex justify-center">
+          <Image
+            src={catsLogo}
+            alt="CATS - Collection Agent Trainer System"
+            className="w-48 h-auto"
+            priority
+          />
         </div>
         <nav className="flex-1 p-4 space-y-1" aria-label="Main navigation">
           {navItems.map((item) => (
