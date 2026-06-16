@@ -37,7 +37,15 @@ function NewSessionContent() {
   useEffect(() => {
     if (!scenarioId) return;
 
-    // Only create session if we're in idle state
+    // Always reset first to ensure clean state for new session
+    reset();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scenarioId]);
+
+  useEffect(() => {
+    if (!scenarioId) return;
+
+    // Create session once store is reset to idle
     if (status === "idle") {
       createSession(scenarioId);
     }

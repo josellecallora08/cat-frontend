@@ -154,15 +154,38 @@ function CallPageContent() {
       // Add debtor response to transcript
       setTranscript((prev) => [...prev, { speaker: "debtor", text: data.text }]);
 
-      // Speak the debtor response using browser TTS
+      // Speak the debtor response
       setStatus("speaking");
       await speakText(data.text);
+
+      // Check if the debtor hung up
+      if (data.call_ended) {
+        setTranscript((prev) => [
+          ...prev,
+          { speaker: "debtor", text: "📞 Debtor ended the call." },
+        ]);
+        setStatus("ended");
+
+        // End the session on the backend
+        try {
+          await fetch(`${API_BASE_URL}/api/sessions/${sessionId}/end`, {
+            method: "POST",
+          });
+        } catch { /* best-effort */ }
+
+        // Redirect to results
+        setTimeout(() => {
+          router.push(`/sessions/${sessionId}/results`);
+        }, 2000);
+        return;
+      }
+
       setStatus("active");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to get response");
       setStatus("active");
     }
-  }, [sessionId, speakText]);
+  }, [sessionId, speakText, router]);
 
   const startListening = useCallback(() => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
