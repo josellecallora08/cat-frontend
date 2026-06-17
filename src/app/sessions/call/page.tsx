@@ -136,6 +136,21 @@ function CallPageContent() {
       setStatus("processing");
       await new Promise((r) => setTimeout(r, 500));
       try {
+        // First check if session is still valid
+        const checkRes = await fetch(`${API_BASE_URL}/api/sessions/${sessionId}`);
+        if (checkRes.ok) {
+          const sessionData = await checkRes.json();
+          if (sessionData.status === "completed" || sessionData.status === "error") {
+            // Session already ended — redirect back to scenarios
+            console.warn("Session already completed, redirecting...");
+            if (!cancelled) {
+              setError("This session has already ended. Starting a new one...");
+              setTimeout(() => router.push("/"), 1500);
+            }
+            return;
+          }
+        }
+
         const res = await fetch(`${API_BASE_URL}/api/sessions/${sessionId}/message`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
