@@ -88,6 +88,7 @@ function CallPageContent() {
   const [transcript, setTranscript] = useState<TranscriptItem[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [continuousMode, setContinuousMode] = useState(true);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const transcriptEndRef = useRef<HTMLDivElement>(null);
 
@@ -192,6 +193,12 @@ function CallPageContent() {
         if (!res.ok) throw new Error(`API error: ${res.status}`);
         const data = await res.json();
         setTranscript((prev) => [...prev, { speaker: "debtor", text: data.text }]);
+
+        // If debtor is interrupting, play immediately (cut any ongoing audio)
+        if (data.interrupt) {
+          speechSynthesis.cancel(); // Stop any browser TTS
+        }
+
         setStatus("speaking");
         await speakText(data.text);
         if (data.call_ended) {
@@ -225,23 +232,71 @@ function CallPageContent() {
       return;
     }
     const recognition = new SpeechRecognition();
-    recognition.continuous = false;
+    recognition.continuous = true;
     recognition.interimResults = false;
     recognition.lang = "fil-PH";
+
     recognition.onstart = () => setStatus("listening");
+
     recognition.onresult = (event: SpeechRecognitionEvent) => {
-      const text = event.results[0][0].transcript;
-      if (text.trim()) sendMessage(text);
-      else setStatus("active");
+      // Get the latest final result
+      const lastResult = event.results[event.results.length - 1];
+      if (lastResult && lastResult[0]) {
+        const text = lastResult[0].transcript.trim();
+        if (text) {
+          // Pause recognition while processing response
+          recognition.stop();
+          sendMessage(text);
+        }
+      }
     };
+
     recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-      if (event.error !== "no-speech") setError(`Speech recognition error: ${event.error}`);
-      setStatus("active");
+      if (event.error === "no-speech" || event.error === "aborted") {
+        // These are normal — restart listening
+        return;
+      }
+      setError(`Speech error: ${event.error}`);
     };
-    recognition.onend = () => setStatus((s) => (s === "listening" ? "active" : s));
+
+    recognition.onend = () => {
+      // Auto-restart if call is still active and in continuous mode
+      setStatus((currentStatus) => {
+        if (currentStatus === "listening" && continuousMode) {
+          setTimeout(() => {
+            try {
+              recognition.start();
+            } catch { /* already started or page navigating away */ }
+          }, 300);
+        }
+        return currentStatus;
+      });
+    };
+
     recognitionRef.current = recognition;
     recognition.start();
-  }, [sendMessage]);
+  }, [sendMessage, continuousMode]);
+
+  // Auto-restart listening after debtor finishes speaking (continuous mode only)
+  useEffect(() => {
+    if (status === "active" && recognitionRef.current && continuousMode) {
+      try {
+        recognitionRef.current.start();
+        setStatus("listening");
+      } catch { /* already running */ }
+    }
+  }, [status, continuousMode]);
+
+  // Auto-start listening when call begins
+  const hasStartedListening = useRef(false);
+  useEffect(() => {
+    if (status === "active" && !hasStartedListening.current) {
+      hasStartedListening.current = true;
+      if (continuousMode) {
+        startListening();
+      }
+    }
+  }, [status, startListening, continuousMode]);
 
   const endCall = useCallback(async () => {
     speechSynthesis.cancel();
@@ -475,15 +530,38 @@ function CallPageContent() {
             {!isEnded && (
               <p className="mt-3 text-center text-xs text-muted-foreground">
                 {status === "listening"
-                  ? "Listening — speak now"
+                  ? "Listening — speak naturally"
                   : status === "active"
-                  ? "Tap the mic to speak"
+                  ? continuousMode ? "Ready — speak anytime" : "Tap mic to speak"
                   : status === "processing"
                   ? "Thinking…"
                   : status === "speaking"
                   ? `${personaName} is speaking…`
                   : ""}
               </p>
+            )}
+            {!isEnded && (
+              <div className="mt-4 flex items-center justify-center gap-2">
+                <label className="text-xs text-muted-foreground cursor-pointer flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={continuousMode}
+                    onChange={(e) => {
+                      setContinuousMode(e.target.checked);
+                      if (!e.target.checked) {
+                        // Stop continuous listening
+                        recognitionRef.current?.stop();
+                        setStatus("active");
+                      } else {
+                        // Start continuous listening
+                        startListening();
+                      }
+                    }}
+                    className="rounded border-border"
+                  />
+                  Continuous listening
+                </label>
+              </div>
             )}
           </div>
         </div>
