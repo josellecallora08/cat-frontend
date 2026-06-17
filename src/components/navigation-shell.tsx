@@ -1,55 +1,119 @@
 "use client";
 
-import Link from "next/link";
 import Image from "next/image";
-import { usePathname } from "next/navigation";
-import { cn } from "@/lib/utils";
-import catsLogo from "@/assets/CATS-SIDEBAR-LOGO.png";
-
-const navItems = [
-  { href: "/", label: "Scenarios", icon: "📋" },
-  { href: "/sessions", label: "Sessions", icon: "🎙️" },
-  { href: "/results", label: "Results", icon: "📊" },
-];
+import { usePathname, useRouter } from "next/navigation";
+import { useRef, useEffect, useCallback } from "react";
+import { LayoutGrid, Mic, BarChart3, Sparkles } from "lucide-react";
+import gsap from "gsap";
+import Dock, { type DockItemData } from "@/components/dock/Dock";
+import catsLogo from "@/assets/CATS-SIDEBAR-LOGO.svg";
 
 export function NavigationShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const contentRef = useRef<HTMLDivElement>(null);
+  const prevPathRef = useRef(pathname);
+
+  // GSAP page transition on route change
+  useEffect(() => {
+    if (prevPathRef.current !== pathname && contentRef.current) {
+      gsap.fromTo(
+        contentRef.current,
+        { opacity: 0, y: 14, scale: 0.98 },
+        {
+          opacity: 1,
+          y: 0,
+          scale: 1,
+          duration: 0.45,
+          ease: "power3.out",
+        }
+      );
+    }
+    prevPathRef.current = pathname;
+  }, [pathname]);
+
+  const navigate = useCallback(
+    (href: string) => {
+      if (pathname === href) return;
+      // Animate out, then navigate
+      if (contentRef.current) {
+        gsap.to(contentRef.current, {
+          opacity: 0,
+          y: -10,
+          scale: 0.98,
+          duration: 0.25,
+          ease: "power2.in",
+          onComplete: () => router.push(href),
+        });
+      } else {
+        router.push(href);
+      }
+    },
+    [pathname, router]
+  );
+
+  const isActive = (href: string) =>
+    href === "/" ? pathname === "/" : pathname.startsWith(href);
+
+  const dockItems: DockItemData[] = [
+    {
+      icon: <LayoutGrid size={22} />,
+      label: "Scenarios",
+      onClick: () => navigate("/"),
+      active: isActive("/"),
+    },
+    {
+      icon: <Mic size={22} />,
+      label: "Sessions",
+      onClick: () => navigate("/sessions"),
+      active: isActive("/sessions"),
+    },
+    {
+      icon: <BarChart3 size={22} />,
+      label: "Results",
+      onClick: () => navigate("/results"),
+      active: isActive("/results"),
+    },
+    {
+      icon: <Sparkles size={22} />,
+      label: "Create Scenario",
+      onClick: () => navigate("/scenarios/create"),
+      active: isActive("/scenarios/create"),
+    },
+  ];
 
   return (
-    <div className="flex h-full min-h-screen">
-      {/* Sidebar */}
-      <aside className="w-64 border-r border-border bg-card flex flex-col">
-        <div className="p-8 border-b border-border flex justify-center">
-          <Image
-            src={catsLogo}
-            alt="CATS - Collection Agent Trainer System"
-            className="w-48 h-auto"
-            priority
-          />
-        </div>
-        <nav className="flex-1 p-4 space-y-1" aria-label="Main navigation">
-          {navItems.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={cn(
-                "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors",
-                pathname === item.href
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-              )}
-            >
-              <span aria-hidden="true">{item.icon}</span>
-              {item.label}
-            </Link>
-          ))}
-        </nav>
-      </aside>
+    <div className="flex min-h-screen flex-col">
+      {/* Top bar with logo */}
+      <header className="sticky top-0 z-50 flex items-center border-b border-border/50 bg-background/60 backdrop-blur-xl px-6 py-3">
+        <Image
+          src={catsLogo}
+          alt="CATS - Collection Agent Trainer System"
+          className="w-56 h-auto brightness-0 invert"
+          priority
+        />
+      </header>
 
       {/* Main content */}
-      <main className="flex-1 overflow-auto">
-        <div className="p-8">{children}</div>
+      <main className="flex-1 overflow-auto pb-28">
+        <div ref={contentRef} className="p-8">
+          {children}
+        </div>
       </main>
+
+      {/* Bottom Dock */}
+      <div className="fixed bottom-4 left-0 right-0 z-50 flex justify-center pointer-events-none">
+        <div className="pointer-events-auto">
+          <Dock
+            items={dockItems}
+            panelHeight={64}
+            baseItemSize={48}
+            magnification={72}
+            distance={180}
+            spring={{ mass: 0.1, stiffness: 170, damping: 14 }}
+          />
+        </div>
+      </div>
     </div>
   );
 }
