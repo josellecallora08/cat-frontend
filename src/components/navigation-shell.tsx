@@ -4,14 +4,22 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 
-const navItems = [
+const agentNavItems = [
   { href: "/", label: "Scenarios", icon: "📋" },
   { href: "/sessions", label: "Sessions", icon: "🎙️" },
   { href: "/results", label: "Results", icon: "📊" },
 ];
 
+const adminNavItems = [
+  { href: "/admin", label: "Dashboard", icon: "📈" },
+  { href: "/admin/scenarios", label: "Manage Scenarios", icon: "⚙️" },
+  { href: "/admin/agents", label: "Agent Performance", icon: "👥" },
+];
+
 export function NavigationShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const isAdmin = pathname.startsWith("/admin");
+  const navItems = isAdmin ? adminNavItems : agentNavItems;
 
   return (
     <div className="flex h-full min-h-screen">
@@ -20,7 +28,7 @@ export function NavigationShell({ children }: { children: React.ReactNode }) {
         <div className="p-6 border-b border-border">
           <h1 className="text-xl font-bold text-foreground">CAT</h1>
           <p className="text-sm text-muted-foreground">
-            Collection Agent Trainer
+            {isAdmin ? "Admin Panel" : "Collection Agent Trainer"}
           </p>
         </div>
         <nav className="flex-1 p-4 space-y-1" aria-label="Main navigation">
@@ -40,6 +48,17 @@ export function NavigationShell({ children }: { children: React.ReactNode }) {
             </Link>
           ))}
         </nav>
+
+        {/* Role switcher */}
+        <div className="p-4 border-t border-border">
+          <Link
+            href={isAdmin ? "/" : "/admin"}
+            className="flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+          >
+            <span aria-hidden="true">{isAdmin ? "🎙️" : "🔒"}</span>
+            {isAdmin ? "Switch to Agent" : "Switch to Admin"}
+          </Link>
+        </div>
       </aside>
 
       {/* Main content */}

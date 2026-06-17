@@ -34,9 +34,6 @@ export default function HomePage() {
             Select a scenario to begin a training session.
           </p>
         </div>
-        <Link href="/scenarios/create">
-          <Button>✨ Create Scenario</Button>
-        </Link>
       </div>
 
       <div className="mt-6">
