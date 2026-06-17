@@ -1,193 +1,213 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useScenarios } from "@/hooks/use-scenarios";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import {
   HeartCrack,
   Flame,
   CalendarClock,
   Scale,
-  Sparkles,
+  Inbox,
+  AlertCircle,
   ArrowRight,
+  type LucideIcon,
 } from "lucide-react";
 
-// Visual config per scenario type — colors drawn from the Kiro palette.
-const typeConfig: Record<
-  string,
-  { icon: typeof HeartCrack; gradient: string; glow: string; label: string }
-> = {
-  FINANCIAL_HARDSHIP: {
-    icon: HeartCrack,
-    gradient: "from-[#6278d1] to-[#222d83]",
-    glow: "group-hover:shadow-[#6278d1]/30",
-    label: "Financial Hardship",
-  },
-  ANGRY_CUSTOMER: {
-    icon: Flame,
-    gradient: "from-[#b33bc4] to-[#51165a]",
-    glow: "group-hover:shadow-[#b33bc4]/30",
-    label: "Angry Customer",
-  },
-  PAYMENT_EXTENSION: {
-    icon: CalendarClock,
-    gradient: "from-[#8e69e0] to-[#472481]",
-    glow: "group-hover:shadow-[#8e69e0]/30",
-    label: "Payment Extension",
-  },
-  BALANCE_DISPUTE: {
-    icon: Scale,
-    gradient: "from-[#e9a3f3] to-[#b33bc4]",
-    glow: "group-hover:shadow-[#e9a3f3]/30",
-    label: "Balance Dispute",
-  },
+type TypeMeta = { icon: LucideIcon; label: string };
+
+const typeMeta: Record<string, TypeMeta> = {
+  FINANCIAL_HARDSHIP: { icon: HeartCrack, label: "Financial Hardship" },
+  ANGRY_CUSTOMER: { icon: Flame, label: "Angry Customer" },
+  PAYMENT_EXTENSION: { icon: CalendarClock, label: "Payment Extension" },
+  BALANCE_DISPUTE: { icon: Scale, label: "Balance Dispute" },
 };
 
-const fallbackConfig = {
-  icon: Sparkles,
-  gradient: "from-[#8e69e0] to-[#222d83]",
-  glow: "group-hover:shadow-[#8e69e0]/30",
-  label: "Scenario",
-};
+const fallbackMeta: TypeMeta = { icon: Inbox, label: "Scenario" };
+
+const filters = [
+  { value: "ALL", label: "All" },
+  { value: "FINANCIAL_HARDSHIP", label: "Financial Hardship" },
+  { value: "ANGRY_CUSTOMER", label: "Angry Customer" },
+  { value: "PAYMENT_EXTENSION", label: "Payment Extension" },
+  { value: "BALANCE_DISPUTE", label: "Balance Dispute" },
+];
 
 function ScenarioCardSkeleton() {
   return (
-    <div className="rounded-2xl border border-border bg-card/60 p-5 shadow-sm animate-pulse">
-      <div className="h-12 w-12 rounded-xl bg-muted" />
-      <div className="mt-5 h-5 w-3/4 rounded bg-muted" />
-      <div className="mt-3 h-4 w-1/3 rounded bg-muted" />
-      <div className="mt-4 h-4 w-full rounded bg-muted/70" />
+    <div className="rounded-lg border border-border bg-card p-6">
+      <div className="h-10 w-10 animate-pulse rounded-lg bg-muted" />
+      <div className="mt-4 h-4 w-20 animate-pulse rounded bg-muted" />
+      <div className="mt-3 h-5 w-3/4 animate-pulse rounded bg-muted" />
+      <div className="mt-3 h-4 w-full animate-pulse rounded bg-muted" />
+      <div className="mt-1.5 h-4 w-2/3 animate-pulse rounded bg-muted" />
     </div>
   );
 }
 
-export default function HomePage() {
+export default function ScenariosPage() {
   const { data: scenarios, isLoading, isError, error, refetch } = useScenarios();
+  const [activeFilter, setActiveFilter] = useState("ALL");
+
+  const visible = useMemo(() => {
+    if (!scenarios) return [];
+    if (activeFilter === "ALL") return scenarios;
+    return scenarios.filter((s) => s.scenario_type === activeFilter);
+  }, [scenarios, activeFilter]);
 
   return (
-    <div className="space-y-8">
-      {/* Hero header */}
-      <div className="relative overflow-hidden rounded-3xl border border-border bg-gradient-to-br from-[#271d40] via-[#1c1430] to-[#18122b] p-8">
-        <div className="absolute -right-10 -top-16 h-56 w-56 rounded-full bg-[#b33bc4]/20 blur-3xl" />
-        <div className="absolute -bottom-20 right-32 h-56 w-56 rounded-full bg-[#6278d1]/20 blur-3xl" />
-        <div className="relative flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-[#e9a3f3]">
-              <Sparkles className="h-3.5 w-3.5" /> Collection Agent Trainer
-            </span>
-            <h2 className="mt-4 text-3xl font-bold tracking-tight text-foreground">
-              Training Scenarios
-            </h2>
-            <p className="mt-2 max-w-md text-sm text-muted-foreground">
-              Pick a realistic debtor scenario and sharpen your collection
-              skills through live, AI-powered conversations.
-            </p>
-          </div>
-          <Link href="/scenarios/create">
-            <Button
-              size="lg"
-              className="bg-gradient-to-r from-primary to-[#b33bc4] text-white shadow-lg shadow-primary/30 hover:opacity-90"
-            >
-              <Sparkles className="h-4 w-4" /> Create Scenario
-            </Button>
-          </Link>
+    <div className="space-y-6">
+      {/* Page heading */}
+      <header className="space-y-1">
+        <h1 className="text-2xl font-medium leading-tight text-foreground">
+          Training Scenarios
+        </h1>
+        <p className="text-sm leading-relaxed text-muted-foreground">
+          Choose a scenario to start a live, AI-powered practice call.
+        </p>
+      </header>
+
+      {/* Filter tabs (pill variant) */}
+      {!isError && (
+        <div
+          role="tablist"
+          aria-label="Filter scenarios by type"
+          className="flex flex-wrap items-center gap-1.5 border-b border-border pb-4"
+        >
+          {filters.map((f) => {
+            const active = activeFilter === f.value;
+            return (
+              <button
+                key={f.value}
+                role="tab"
+                aria-selected={active}
+                onClick={() => setActiveFilter(f.value)}
+                className={cn(
+                  "min-h-9 rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                  active
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                )}
+              >
+                {f.label}
+              </button>
+            );
+          })}
         </div>
-      </div>
+      )}
 
-      {/* Content */}
-      <div>
-        {isLoading && (
-          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <ScenarioCardSkeleton key={i} />
-            ))}
+      {/* Loading */}
+      {isLoading && (
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <ScenarioCardSkeleton key={i} />
+          ))}
+        </div>
+      )}
+
+      {/* Error */}
+      {isError && (
+        <div
+          role="alert"
+          className="flex flex-col items-center rounded-lg border border-border bg-card px-6 py-12 text-center"
+        >
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10">
+            <AlertCircle className="h-6 w-6 text-destructive" aria-hidden="true" />
           </div>
-        )}
+          <h2 className="mt-4 text-base font-medium text-foreground">
+            Couldn&apos;t load scenarios
+          </h2>
+          <p className="mt-1 max-w-sm text-sm text-muted-foreground">
+            {error instanceof Error ? error.message : "An unexpected error occurred."}
+          </p>
+          <Button variant="outline" size="sm" className="mt-4" onClick={() => refetch()}>
+            Try again
+          </Button>
+        </div>
+      )}
 
-        {isError && (
-          <div className="rounded-2xl border border-destructive/40 bg-destructive/10 p-8 text-center">
-            <p className="font-medium text-destructive">Failed to load scenarios</p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {error instanceof Error ? error.message : "An unexpected error occurred"}
-            </p>
-            <Button variant="outline" size="sm" className="mt-4" onClick={() => refetch()}>
-              Retry
+      {/* Empty */}
+      {!isLoading && !isError && visible.length === 0 && (
+        <div className="flex flex-col items-center rounded-lg border border-dashed border-border bg-card px-6 py-12 text-center">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-secondary">
+            <Inbox className="h-6 w-6 text-secondary-foreground" aria-hidden="true" />
+          </div>
+          <h2 className="mt-4 text-base font-medium text-foreground">
+            {activeFilter === "ALL"
+              ? "No scenarios available"
+              : "No scenarios in this category"}
+          </h2>
+          <p className="mt-1 max-w-sm text-sm text-muted-foreground">
+            {activeFilter === "ALL"
+              ? "Scenarios are added by your administrator. Check back soon."
+              : "Try a different category or view all scenarios."}
+          </p>
+          {activeFilter !== "ALL" && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="mt-4"
+              onClick={() => setActiveFilter("ALL")}
+            >
+              View all
             </Button>
-          </div>
-        )}
+          )}
+        </div>
+      )}
 
-        {!isLoading && !isError && scenarios?.length === 0 && (
-          <div className="rounded-2xl border border-dashed border-border bg-card/40 p-12 text-center">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-[#b33bc4] text-white shadow-lg shadow-primary/30">
-              <Sparkles className="h-6 w-6" />
-            </div>
-            <p className="mt-4 font-medium text-foreground">No scenarios yet</p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Generate your first training scenario to get started.
-            </p>
-            <Link href="/scenarios/create" className="mt-5 inline-block">
-              <Button className="bg-gradient-to-r from-primary to-[#b33bc4] text-white">
-                Create Scenario
-              </Button>
-            </Link>
-          </div>
-        )}
-
-        {!isLoading && !isError && scenarios && scenarios.length > 0 && (
-          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {scenarios.map((scenario) => {
-              const config = typeConfig[scenario.scenario_type] ?? fallbackConfig;
-              const Icon = config.icon;
-              return (
-                <Link
-                  key={scenario.id}
-                  href={`/scenarios/${scenario.id}`}
-                  className="group focus-visible:outline-none"
-                >
-                  <article
-                    className={cn(
-                      "relative flex h-full flex-col overflow-hidden rounded-2xl border border-border bg-card/70 p-5 shadow-sm transition-all duration-300",
-                      "hover:-translate-y-1 hover:border-primary/40 hover:shadow-xl",
-                      config.glow
-                    )}
-                  >
-                    {/* subtle corner glow */}
-                    <div
-                      className={`pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full bg-gradient-to-br ${config.gradient} opacity-0 blur-2xl transition-opacity duration-300 group-hover:opacity-40`}
+      {/* Grid */}
+      {!isLoading && !isError && visible.length > 0 && (
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          {visible.map((scenario) => {
+            const meta = typeMeta[scenario.scenario_type] ?? fallbackMeta;
+            const Icon = meta.icon;
+            return (
+              <Link
+                key={scenario.id}
+                href={`/scenarios/${scenario.id}`}
+                aria-label={`Start training: ${scenario.name}`}
+                className="group rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                <article className="flex h-full flex-col rounded-lg border border-border bg-card p-6 transition-colors duration-100 group-hover:bg-muted">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-secondary">
+                    <Icon
+                      className="h-5 w-5 text-secondary-foreground"
+                      aria-hidden="true"
                     />
+                  </div>
 
-                    <div
-                      className={`flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br ${config.gradient} text-white shadow-lg`}
-                    >
-                      <Icon className="h-6 w-6" />
-                    </div>
+                  <div className="mt-4">
+                    <Badge>{meta.label}</Badge>
+                  </div>
 
-                    <span className="mt-4 inline-flex w-fit items-center rounded-full bg-accent/60 px-2.5 py-0.5 text-[11px] font-medium text-[#cec4f2]">
-                      {config.label}
-                    </span>
+                  <h2 className="mt-2 text-lg font-medium leading-tight text-foreground">
+                    {scenario.name}
+                  </h2>
 
-                    <h3 className="mt-2 text-lg font-semibold leading-snug text-foreground">
-                      {scenario.name}
-                    </h3>
+                  {scenario.description && (
+                    <p className="mt-1.5 line-clamp-2 text-sm leading-relaxed text-muted-foreground">
+                      {scenario.description}
+                    </p>
+                  )}
 
-                    {scenario.description && (
-                      <p className="mt-1.5 line-clamp-2 text-sm text-muted-foreground">
-                        {scenario.description}
-                      </p>
-                    )}
-
-                    <span className="mt-auto flex items-center gap-1.5 pt-4 text-sm font-medium text-primary opacity-0 transition-opacity duration-300 group-hover:opacity-100">
+                  <div className="mt-auto flex items-center pt-5">
+                    <span className="inline-flex items-center gap-1.5 text-sm font-medium text-primary">
                       Start training
-                      <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+                      <ArrowRight
+                        className="h-4 w-4 transition-transform duration-100 group-hover:translate-x-0.5"
+                        aria-hidden="true"
+                      />
                     </span>
-                  </article>
-                </Link>
-              );
-            })}
-          </div>
-        )}
-      </div>
+                  </div>
+                </article>
+              </Link>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

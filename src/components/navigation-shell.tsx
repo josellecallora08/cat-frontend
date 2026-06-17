@@ -2,11 +2,16 @@
 
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
-import { useRef, useEffect, useCallback } from "react";
-import { LayoutGrid, Mic, BarChart3, Sparkles } from "lucide-react";
+import { useRef, useEffect, useCallback, useLayoutEffect } from "react";
+import { LayoutGrid, Mic, BarChart3 } from "lucide-react";
 import gsap from "gsap";
-import Dock, { type DockItemData } from "@/components/dock/Dock";
 import catsLogo from "@/assets/CATS-SIDEBAR-LOGO.svg";
+
+const navItems = [
+  { href: "/", label: "Scenarios", icon: LayoutGrid },
+  { href: "/sessions", label: "Sessions", icon: Mic },
+  { href: "/results", label: "Results", icon: BarChart3 },
+];
 
 export function NavigationShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -14,106 +19,142 @@ export function NavigationShell({ children }: { children: React.ReactNode }) {
   const contentRef = useRef<HTMLDivElement>(null);
   const prevPathRef = useRef(pathname);
 
-  // GSAP page transition on route change
+  const navRef = useRef<HTMLElement>(null);
+  const pillRef = useRef<HTMLSpanElement>(null);
+  const itemRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+
+  const prefersReduced =
+    typeof window !== "undefined" &&
+    window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+
+  const isActive = useCallback(
+    (href: string) =>
+      href === "/" ? pathname === "/" : pathname.startsWith(href),
+    [pathname]
+  );
+
+  // Slide the active indicator under the current nav item.
+  const movePill = useCallback(
+    (animate: boolean) => {
+      const active = navItems.find((i) => isActive(i.href));
+      const el = active ? itemRefs.current[active.href] : null;
+      const pill = pillRef.current;
+      const nav = navRef.current;
+      if (!el || !pill || !nav) {
+        if (pill) gsap.set(pill, { opacity: 0 });
+        return;
+      }
+      const navBox = nav.getBoundingClientRect();
+      const box = el.getBoundingClientRect();
+      gsap.to(pill, {
+        left: box.left - navBox.left,
+        width: box.width,
+        opacity: 1,
+        duration: animate && !prefersReduced ? 0.4 : 0,
+        ease: "power3.out",
+      });
+    },
+    [isActive, prefersReduced]
+  );
+
+  useLayoutEffect(() => {
+    movePill(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useEffect(() => {
-    if (prevPathRef.current !== pathname && contentRef.current) {
+    movePill(true);
+  }, [pathname, movePill]);
+
+  useEffect(() => {
+    const onResize = () => movePill(false);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, [movePill]);
+
+  // Subtle page transition on route change
+  useEffect(() => {
+    if (prevPathRef.current !== pathname && contentRef.current && !prefersReduced) {
       gsap.fromTo(
         contentRef.current,
-        { opacity: 0, y: 14, scale: 0.98 },
-        {
-          opacity: 1,
-          y: 0,
-          scale: 1,
-          duration: 0.45,
-          ease: "power3.out",
-        }
+        { opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: 0.3, ease: "power2.out" }
       );
     }
     prevPathRef.current = pathname;
-  }, [pathname]);
+  }, [pathname, prefersReduced]);
 
   const navigate = useCallback(
     (href: string) => {
       if (pathname === href) return;
-      // Animate out, then navigate
-      if (contentRef.current) {
-        gsap.to(contentRef.current, {
-          opacity: 0,
-          y: -10,
-          scale: 0.98,
-          duration: 0.25,
-          ease: "power2.in",
-          onComplete: () => router.push(href),
-        });
-      } else {
-        router.push(href);
-      }
+      router.push(href);
     },
     [pathname, router]
   );
 
-  const isActive = (href: string) =>
-    href === "/" ? pathname === "/" : pathname.startsWith(href);
-
-  const dockItems: DockItemData[] = [
-    {
-      icon: <LayoutGrid size={22} />,
-      label: "Scenarios",
-      onClick: () => navigate("/"),
-      active: isActive("/"),
-    },
-    {
-      icon: <Mic size={22} />,
-      label: "Sessions",
-      onClick: () => navigate("/sessions"),
-      active: isActive("/sessions"),
-    },
-    {
-      icon: <BarChart3 size={22} />,
-      label: "Results",
-      onClick: () => navigate("/results"),
-      active: isActive("/results"),
-    },
-    {
-      icon: <Sparkles size={22} />,
-      label: "Create Scenario",
-      onClick: () => navigate("/scenarios/create"),
-      active: isActive("/scenarios/create"),
-    },
-  ];
-
   return (
-    <div className="flex min-h-screen flex-col">
-      {/* Top bar with logo */}
-      <header className="sticky top-0 z-50 flex items-center border-b border-border/50 bg-background/60 backdrop-blur-xl px-6 py-3">
-        <Image
-          src={catsLogo}
-          alt="CATS - Collection Agent Trainer System"
-          className="w-56 h-auto brightness-0 invert"
-          priority
-        />
+    <div className="flex min-h-screen flex-col bg-background">
+      {/* Top bar */}
+      <header className="sticky top-0 z-50 h-14 border-b border-border bg-background">
+        <div className="mx-auto flex h-full max-w-7xl items-center justify-between gap-6 px-6 lg:px-8">
+          <Image
+            src={catsLogo}
+            alt="CATS - Collection Agent Trainer System"
+            className="h-9 w-auto shrink-0"
+            priority
+          />
+
+          <nav
+            ref={navRef}
+            aria-label="Main navigation"
+            className="relative flex items-center gap-1 rounded-full border border-border bg-muted/60 p-1"
+          >
+            <span
+              ref={pillRef}
+              aria-hidden="true"
+              className="absolute top-1 bottom-1 rounded-full bg-primary"
+              style={{ left: 0, width: 0, opacity: 0 }}
+            />
+            {navItems.map((item) => {
+              const active = isActive(item.href);
+              const Icon = item.icon;
+              return (
+                <button
+                  key={item.href}
+                  ref={(el) => {
+                    itemRefs.current[item.href] = el;
+                  }}
+                  onClick={() => navigate(item.href)}
+                  aria-current={active ? "page" : undefined}
+                  className={`relative z-10 flex min-h-9 items-center gap-2 rounded-full px-4 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
+                    active
+                      ? "text-primary-foreground"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <Icon className="h-[18px] w-[18px]" aria-hidden="true" />
+                  <span className="hidden sm:inline">{item.label}</span>
+                </button>
+              );
+            })}
+          </nav>
+
+          {/* User avatar slot */}
+          <div
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-secondary text-sm font-medium text-secondary-foreground"
+            aria-label="Account"
+          >
+            A
+          </div>
+        </div>
       </header>
 
       {/* Main content */}
-      <main className="flex-1 overflow-auto pb-28">
-        <div ref={contentRef} className="p-8">
+      <main className="flex-1 overflow-auto">
+        <div ref={contentRef} className="mx-auto max-w-7xl px-6 py-8 lg:px-8">
           {children}
         </div>
       </main>
-
-      {/* Bottom Dock */}
-      <div className="fixed bottom-4 left-0 right-0 z-50 flex justify-center pointer-events-none">
-        <div className="pointer-events-auto">
-          <Dock
-            items={dockItems}
-            panelHeight={64}
-            baseItemSize={48}
-            magnification={72}
-            distance={180}
-            spring={{ mass: 0.1, stiffness: 170, damping: 14 }}
-          />
-        </div>
-      </div>
     </div>
   );
 }
