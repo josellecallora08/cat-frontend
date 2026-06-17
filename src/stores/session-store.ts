@@ -48,6 +48,15 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
 
     try {
       const session = await apiCreateSession(scenarioId);
+
+      // Track session in localStorage for history page
+      const stored = localStorage.getItem("cat_sessions");
+      const sessionIds: string[] = stored ? JSON.parse(stored) : [];
+      if (!sessionIds.includes(session.id)) {
+        sessionIds.unshift(session.id);
+        localStorage.setItem("cat_sessions", JSON.stringify(sessionIds.slice(0, 50)));
+      }
+
       set({
         sessionId: session.id,
         session,

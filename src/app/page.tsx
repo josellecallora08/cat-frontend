@@ -27,10 +27,17 @@ export default function HomePage() {
 
   return (
     <div>
-      <h2 className="text-2xl font-bold tracking-tight">Training Scenarios</h2>
-      <p className="text-muted-foreground mt-2">
-        Select a scenario to begin a training session.
-      </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight">Training Scenarios</h2>
+          <p className="text-muted-foreground mt-2">
+            Select a scenario to begin a training session.
+          </p>
+        </div>
+        <Link href="/scenarios/create">
+          <Button>✨ Create Scenario</Button>
+        </Link>
+      </div>
 
       <div className="mt-6">
         {isLoading && (
