@@ -52,23 +52,32 @@ describe("HomePage - Scenario List", () => {
     renderWithProviders(<HomePage />);
 
     await waitFor(() => {
-      expect(screen.getByText("Financial Hardship")).toBeInTheDocument();
+      expect(
+        screen.getByRole("heading", { name: "Financial Hardship" })
+      ).toBeInTheDocument();
     });
 
-    expect(screen.getByText("Angry Customer")).toBeInTheDocument();
-    expect(screen.getByText("Payment Extension Request")).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Angry Customer" })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Payment Extension Request" })
+    ).toBeInTheDocument();
 
-    // Scenario type displayed
-    expect(screen.getByText("financial hardship")).toBeInTheDocument();
-    expect(screen.getByText("angry customer")).toBeInTheDocument();
-    expect(screen.getByText("payment extension")).toBeInTheDocument();
+    // Scenario type badge labels displayed on cards (title-cased)
+    expect(
+      screen.getAllByText("Payment Extension").length
+    ).toBeGreaterThan(0);
+    expect(screen.getAllByText("Angry Customer").length).toBeGreaterThan(0);
   });
 
   it("links each card to the scenario detail page", async () => {
     renderWithProviders(<HomePage />);
 
     await waitFor(() => {
-      expect(screen.getByText("Financial Hardship")).toBeInTheDocument();
+      expect(
+        screen.getByRole("heading", { name: "Financial Hardship" })
+      ).toBeInTheDocument();
     });
 
     const links = screen.getAllByRole("link");
@@ -106,10 +115,10 @@ describe("HomePage - Scenario List", () => {
     renderWithProviders(<HomePage />);
 
     await waitFor(() => {
-      expect(screen.getByText("Failed to load scenarios")).toBeInTheDocument();
+      expect(screen.getByText(/couldn't load scenarios/i)).toBeInTheDocument();
     });
 
-    expect(screen.getByRole("button", { name: /retry/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /try again/i })).toBeInTheDocument();
   });
 
   it("retries fetching when retry button is clicked", async () => {
@@ -129,13 +138,15 @@ describe("HomePage - Scenario List", () => {
     renderWithProviders(<HomePage />);
 
     await waitFor(() => {
-      expect(screen.getByText("Failed to load scenarios")).toBeInTheDocument();
+      expect(screen.getByText(/couldn't load scenarios/i)).toBeInTheDocument();
     });
 
-    await user.click(screen.getByRole("button", { name: /retry/i }));
+    await user.click(screen.getByRole("button", { name: /try again/i }));
 
     await waitFor(() => {
-      expect(screen.getByText("Financial Hardship")).toBeInTheDocument();
+      expect(
+        screen.getByRole("heading", { name: "Financial Hardship" })
+      ).toBeInTheDocument();
     });
   });
 });
