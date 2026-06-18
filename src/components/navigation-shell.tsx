@@ -13,6 +13,12 @@ const navItems = [
   { href: "/results", label: "Results", icon: BarChart3 },
 ];
 
+const adminNavItems = [
+  { href: "/admin", label: "Dashboard", icon: "📈" },
+  { href: "/admin/scenarios", label: "Manage Scenarios", icon: "⚙️" },
+  { href: "/admin/agents", label: "Agent Performance", icon: "👥" },
+];
+
 export function NavigationShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
