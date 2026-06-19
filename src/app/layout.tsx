@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { Nunito, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { AppProviders } from "@/components/providers";
-import { NavigationShell } from "@/components/navigation-shell";
+import { AuthGuard } from "@/components/auth-guard";
+import { AppShell } from "@/components/app-shell";
 
 const nunito = Nunito({
   variable: "--font-sans",
@@ -33,7 +34,9 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col">
         <AppProviders>
-          <NavigationShell>{children}</NavigationShell>
+          <AuthGuard>
+            <AppShell>{children}</AppShell>
+          </AuthGuard>
         </AppProviders>
       </body>
     </html>
