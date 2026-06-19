@@ -3,25 +3,26 @@
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { useRef, useEffect, useCallback, useLayoutEffect } from "react";
-import { LayoutGrid, Mic, BarChart3 } from "lucide-react";
+import { LayoutGrid, Mic, Users, TrendingUp, LogOut } from "lucide-react";
 import gsap from "gsap";
+import { useAuthStore } from "@/stores/auth-store";
+import { cn } from "@/lib/utils";
 import catsLogo from "@/assets/CATS-SIDEBAR-LOGO.svg";
 
-const navItems = [
-  { href: "/", label: "Scenarios", icon: LayoutGrid },
+const agentNavItems = [
+  { href: "/", label: "Dashboard", icon: TrendingUp },
+  { href: "/scenarios", label: "Scenarios", icon: LayoutGrid },
   { href: "/sessions", label: "Sessions", icon: Mic },
-  { href: "/results", label: "Results", icon: BarChart3 },
 ];
 
 const adminNavItems = [
-  { href: "/admin", label: "Dashboard", icon: "📈" },
-  { href: "/admin/scenarios", label: "Manage Scenarios", icon: "⚙️" },
-  { href: "/admin/agents", label: "Agent Performance", icon: "👥" },
+  { href: "/admin/agents", label: "Agents", icon: Users },
 ];
 
 export function NavigationShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
+  const { user, logout } = useAuthStore();
   const contentRef = useRef<HTMLDivElement>(null);
   const prevPathRef = useRef(pathname);
 
@@ -33,9 +34,15 @@ export function NavigationShell({ children }: { children: React.ReactNode }) {
     typeof window !== "undefined" &&
     window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 
+  // Determine which nav items to show based on role
+  const isAdmin = user?.role === "admin";
+  const navItems = isAdmin ? [...agentNavItems, ...adminNavItems] : agentNavItems;
+
   const isActive = useCallback(
-    (href: string) =>
-      href === "/" ? pathname === "/" : pathname.startsWith(href),
+    (href: string) => {
+      if (href === "/") return pathname === "/";
+      return pathname === href || pathname.startsWith(href + "/");
+    },
     [pathname]
   );
 
@@ -60,7 +67,8 @@ export function NavigationShell({ children }: { children: React.ReactNode }) {
         ease: "power3.out",
       });
     },
-    [isActive, prefersReduced]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [isActive, prefersReduced, isAdmin]
   );
 
   useLayoutEffect(() => {
@@ -98,11 +106,18 @@ export function NavigationShell({ children }: { children: React.ReactNode }) {
     [pathname, router]
   );
 
+  const handleLogout = useCallback(() => {
+    logout();
+    router.push("/login");
+  }, [logout, router]);
+
+  const initial = user?.full_name?.charAt(0)?.toUpperCase() ?? "U";
+
   return (
     <div className="flex min-h-screen flex-col bg-background">
       {/* Top bar */}
       <header className="sticky top-0 z-50 h-14 border-b border-border bg-background">
-        <div className="mx-auto flex h-full max-w-7xl items-center justify-between gap-6 px-6 lg:px-8">
+        <div className="mx-auto flex h-full max-w-7xl items-center justify-between gap-4 px-6 lg:px-8">
           <Image
             src={catsLogo}
             alt="CATS - Collection Agent Trainer System"
@@ -132,11 +147,12 @@ export function NavigationShell({ children }: { children: React.ReactNode }) {
                   }}
                   onClick={() => navigate(item.href)}
                   aria-current={active ? "page" : undefined}
-                  className={`relative z-10 flex min-h-9 items-center gap-2 rounded-full px-4 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
+                  className={cn(
+                    "relative z-10 flex min-h-9 items-center gap-2 rounded-full px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
                     active
                       ? "text-primary-foreground"
                       : "text-muted-foreground hover:text-foreground"
-                  }`}
+                  )}
                 >
                   <Icon className="h-[18px] w-[18px]" aria-hidden="true" />
                   <span className="hidden sm:inline">{item.label}</span>
@@ -145,12 +161,31 @@ export function NavigationShell({ children }: { children: React.ReactNode }) {
             })}
           </nav>
 
-          {/* User avatar slot */}
-          <div
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-secondary text-sm font-medium text-secondary-foreground"
-            aria-label="Account"
-          >
-            A
+          {/* User info + logout */}
+          <div className="flex items-center gap-2">
+            <div className="hidden items-center gap-2 sm:flex">
+              <div
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-secondary text-sm font-medium text-secondary-foreground"
+                aria-hidden="true"
+              >
+                {initial}
+              </div>
+              <div className="hidden lg:block">
+                <p className="text-sm font-medium leading-none text-foreground">
+                  {user?.full_name}
+                </p>
+                <p className="text-xs text-muted-foreground capitalize">
+                  {user?.role}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={handleLogout}
+              aria-label="Sign out"
+              className="flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            >
+              <LogOut className="h-4 w-4" aria-hidden="true" />
+            </button>
           </div>
         </div>
       </header>

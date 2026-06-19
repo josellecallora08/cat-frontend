@@ -212,6 +212,8 @@ function CallPageContent() {
           } catch {
             /* best-effort */
           }
+          // Reset the session store so a new session can be created next time
+          useSessionStore.getState().reset();
           setTimeout(() => router.push(`/sessions/${sessionId}/results`), 2000);
           return;
         }
@@ -309,6 +311,8 @@ function CallPageContent() {
         /* best-effort */
       }
     }
+    // Reset the session store so a new session can be created next time
+    useSessionStore.getState().reset();
     setTimeout(() => router.push(`/sessions/${sessionId}/results`), 1200);
   }, [sessionId, router]);
 
