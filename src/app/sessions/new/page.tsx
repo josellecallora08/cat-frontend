@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect } from "react";
+import { Suspense, useEffect, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useSessionStore } from "@/stores/session-store";
 import { Card, CardContent } from "@/components/ui/card";
@@ -88,15 +88,22 @@ function NewSessionContent() {
 
   const { status, error, sessionId, createSession, reset } = useSessionStore();
 
+  // Track whether we've initiated creation for this mount/scenarioId
+  const hasInitiated = useRef(false);
+
+  // Always reset on mount or when scenarioId changes, then trigger creation
   useEffect(() => {
     if (!scenarioId) return;
+    hasInitiated.current = false;
     reset();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scenarioId]);
 
+  // After reset brings us to "idle", create the session (only once per mount)
   useEffect(() => {
     if (!scenarioId) return;
-    if (status === "idle") {
+    if (status === "idle" && !hasInitiated.current) {
+      hasInitiated.current = true;
       createSession(scenarioId);
     }
   }, [scenarioId, status, createSession]);
