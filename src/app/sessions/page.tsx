@@ -5,35 +5,37 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Mic, ArrowRight } from "lucide-react";
+import { useAuthStore } from "@/stores/auth-store";
+import { Mic, ArrowRight, Loader2 } from "lucide-react";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
 
 interface SessionItem {
   id: string;
-  scenario_id: string;
-  persona: { name: string; communication_style: string; emotional_state: string } | null;
+  scenario_name: string;
+  persona_name: string;
+  agent_name: string;
+  agent_email: string;
   status: string;
+  overall_score: number | null;
   created_at: string;
-  ended_at: string | null;
 }
 
-async function fetchAllSessions(): Promise<SessionItem[]> {
-  const stored = localStorage.getItem("cat_sessions");
-  if (!stored) return [];
-  const sessionIds: string[] = JSON.parse(stored);
-  const sessions: SessionItem[] = [];
-  for (const id of sessionIds) {
-    try {
-      const res = await fetch(`${API_BASE_URL}/api/sessions/${id}`);
-      if (res.ok) sessions.push(await res.json());
-    } catch {
-      /* skip failed */
-    }
-  }
-  return sessions.sort(
-    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-  );
+interface PaginatedSessions {
+  items: SessionItem[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+}
+
+async function fetchMySessions(agentId?: string): Promise<SessionItem[]> {
+  const params = new URLSearchParams({ page: "1", page_size: "50" });
+  if (agentId) params.set("agent_id", agentId);
+  const res = await fetch(`${API_BASE_URL}/api/dashboard/sessions?${params}`);
+  if (!res.ok) return [];
+  const data: PaginatedSessions = await res.json();
+  return data.items;
 }
 
 function formatDate(dateStr: string): string {
@@ -60,9 +62,14 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 export default function SessionsPage() {
+  const user = useAuthStore((s) => s.user);
+  const isAdmin = user?.role === "admin";
+  // Agents see only their own sessions; admins see all
+  const agentFilter = !isAdmin && user?.id ? user.id : undefined;
+
   const { data: sessions, isLoading } = useQuery({
-    queryKey: ["all-sessions"],
-    queryFn: fetchAllSessions,
+    queryKey: ["my-sessions", agentFilter],
+    queryFn: () => fetchMySessions(agentFilter),
   });
 
   return (
@@ -72,18 +79,13 @@ export default function SessionsPage() {
           Sessions
         </h1>
         <p className="text-sm leading-relaxed text-muted-foreground">
-          Your training session history.
+          {isAdmin ? "All training sessions." : "Your training session history."}
         </p>
       </header>
 
       {isLoading && (
-        <div className="space-y-3">
-          {[1, 2, 3].map((i) => (
-            <div
-              key={i}
-              className="h-[72px] animate-pulse rounded-lg border border-border bg-muted"
-            />
-          ))}
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" aria-hidden="true" />
         </div>
       )}
 
@@ -98,7 +100,7 @@ export default function SessionsPage() {
           <p className="mt-1 max-w-sm text-sm text-muted-foreground">
             Pick a scenario to run your first training call.
           </p>
-          <Link href="/" className="mt-4">
+          <Link href="/scenarios" className="mt-4">
             <Button size="sm">Browse scenarios</Button>
           </Link>
         </div>
@@ -113,14 +115,18 @@ export default function SessionsPage() {
                   <div className="min-w-0 space-y-1.5">
                     <div className="flex items-center gap-2">
                       <p className="truncate text-sm font-medium text-foreground">
-                        {session.persona?.name ?? "Training session"}
+                        {session.scenario_name}
                       </p>
                       <StatusBadge status={session.status} />
+                      {session.overall_score !== null && (
+                        <span className="text-xs font-medium text-foreground">
+                          {session.overall_score}%
+                        </span>
+                      )}
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      {formatDate(session.created_at)}
-                      {session.persona &&
-                        ` · ${session.persona.communication_style}`}
+                      {session.persona_name} · {formatDate(session.created_at)}
+                      {isAdmin && ` · ${session.agent_name}`}
                     </p>
                   </div>
                   {session.status === "completed" && (

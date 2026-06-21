@@ -72,9 +72,13 @@ export interface LearningPlan {
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
 
 export async function createSession(scenarioId: string): Promise<SessionResponse> {
+  const token = typeof window !== "undefined" ? localStorage.getItem("cat_token") : null;
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
   const response = await fetch(`${API_BASE_URL}/api/sessions`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify({ scenario_id: scenarioId }),
   });
 
