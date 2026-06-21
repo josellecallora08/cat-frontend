@@ -288,7 +288,7 @@ export function AuthShell() {
               ref={mascotRef}
               className="relative shrink-0 w-[60px] md:w-[72px] h-auto"
             >
-              <div ref={starsRef} aria-hidden="true">
+              <div ref={starsRef} aria-hidden="true" className="absolute inset-0 z-10">
                 <span className="success-star absolute left-[-10%] top-[30%] w-[14px] h-[14px] opacity-0 pointer-events-none origin-center before:absolute before:inset-[5px_1px] before:rounded-full before:bg-[#fff200] after:absolute after:inset-[5px_1px] after:rounded-full after:bg-[#fff200] after:rotate-90" />
                 <span className="success-star absolute left-[52%] top-[-6%] w-[12px] h-[12px] opacity-0 pointer-events-none origin-center before:absolute before:inset-[4px_1px] before:rounded-full before:bg-[#fff200] after:absolute after:inset-[4px_1px] after:rounded-full after:bg-[#fff200] after:rotate-90" />
                 <span className="success-star absolute right-[-12%] top-[40%] w-[14px] h-[14px] opacity-0 pointer-events-none origin-center before:absolute before:inset-[5px_1px] before:rounded-full before:bg-[#fff200] after:absolute after:inset-[5px_1px] after:rounded-full after:bg-[#fff200] after:rotate-90" />
