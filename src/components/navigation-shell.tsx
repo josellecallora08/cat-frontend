@@ -115,80 +115,82 @@ export function NavigationShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
-      {/* Top bar */}
-      <header className="sticky top-0 z-50 h-14 border-b border-border bg-background">
-        <div className="mx-auto flex h-full max-w-7xl items-center justify-between gap-4 px-6 lg:px-8">
-          <Image
-            src={catsLogo}
-            alt="CATS - Collection Agent Trainer System"
-            className="h-9 w-auto shrink-0"
-            priority
-          />
-
-          <nav
-            ref={navRef}
-            aria-label="Main navigation"
-            className="relative flex items-center gap-1 rounded-full border border-border bg-muted/60 p-1"
-          >
-            <span
-              ref={pillRef}
-              aria-hidden="true"
-              className="absolute top-1 bottom-1 rounded-full bg-primary"
-              style={{ left: 0, width: 0, opacity: 0 }}
+      {/* Floating top bar */}
+      <div className="sticky top-0 z-50 px-4 pt-4 lg:px-6">
+        <header className="mx-auto max-w-7xl rounded-2xl border border-border/50 bg-background/80 shadow-lg shadow-black/5 backdrop-blur-xl">
+          <div className="flex h-14 items-center justify-between gap-4 px-6">
+            <Image
+              src={catsLogo}
+              alt="CATS - Collection Agent Trainer System"
+              className="h-9 w-auto shrink-0"
+              priority
             />
-            {navItems.map((item) => {
-              const active = isActive(item.href);
-              const Icon = item.icon;
-              return (
-                <button
-                  key={item.href}
-                  ref={(el) => {
-                    itemRefs.current[item.href] = el;
-                  }}
-                  onClick={() => navigate(item.href)}
-                  aria-current={active ? "page" : undefined}
-                  className={cn(
-                    "relative z-10 flex min-h-9 items-center gap-2 rounded-full px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-                    active
-                      ? "text-primary-foreground"
-                      : "text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  <Icon className="h-[18px] w-[18px]" aria-hidden="true" />
-                  <span className="hidden sm:inline">{item.label}</span>
-                </button>
-              );
-            })}
-          </nav>
 
-          {/* User info + logout */}
-          <div className="flex items-center gap-2">
-            <div className="hidden items-center gap-2 sm:flex">
-              <div
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-secondary text-sm font-medium text-secondary-foreground"
-                aria-hidden="true"
-              >
-                {initial}
-              </div>
-              <div className="hidden lg:block">
-                <p className="text-sm font-medium leading-none text-foreground">
-                  {user?.full_name}
-                </p>
-                <p className="text-xs text-muted-foreground capitalize">
-                  {user?.role}
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={handleLogout}
-              aria-label="Sign out"
-              className="flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            <nav
+              ref={navRef}
+              aria-label="Main navigation"
+              className="relative flex items-center gap-1 rounded-full border border-border bg-muted/60 p-1"
             >
-              <LogOut className="h-4 w-4" aria-hidden="true" />
-            </button>
+              <span
+                ref={pillRef}
+                aria-hidden="true"
+                className="absolute top-1 bottom-1 rounded-full bg-primary"
+                style={{ left: 0, width: 0, opacity: 0 }}
+              />
+              {navItems.map((item) => {
+                const active = isActive(item.href);
+                const Icon = item.icon;
+                return (
+                  <button
+                    key={item.href}
+                    ref={(el) => {
+                      itemRefs.current[item.href] = el;
+                    }}
+                    onClick={() => navigate(item.href)}
+                    aria-current={active ? "page" : undefined}
+                    className={cn(
+                      "relative z-10 flex min-h-9 items-center gap-2 rounded-full px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                      active
+                        ? "text-primary-foreground"
+                        : "text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    <Icon className="h-[18px] w-[18px]" aria-hidden="true" />
+                    <span className="hidden sm:inline">{item.label}</span>
+                  </button>
+                );
+              })}
+            </nav>
+
+            {/* User info + logout */}
+            <div className="flex items-center gap-2">
+              <div className="hidden items-center gap-2 sm:flex">
+                <div
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-secondary text-sm font-medium text-secondary-foreground"
+                  aria-hidden="true"
+                >
+                  {initial}
+                </div>
+                <div className="hidden lg:block">
+                  <p className="text-sm font-medium leading-none text-foreground">
+                    {user?.full_name}
+                  </p>
+                  <p className="text-xs text-muted-foreground capitalize">
+                    {user?.role}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={handleLogout}
+                aria-label="Sign out"
+                className="flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                <LogOut className="h-4 w-4" aria-hidden="true" />
+              </button>
+            </div>
           </div>
-        </div>
-      </header>
+        </header>
+      </div>
 
       {/* Main content */}
       <main className="flex-1 overflow-auto">
