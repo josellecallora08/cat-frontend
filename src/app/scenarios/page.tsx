@@ -275,46 +275,38 @@ export default function ScenariosPage() {
 
       {/* Grid */}
       {!isLoading && !isError && visible.length > 0 && (
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {visible.map((scenario) => {
             const meta = typeMeta[scenario.scenario_type] ?? fallbackMeta;
-            const Icon = meta.icon;
             return (
               <div key={scenario.id} className="relative group">
                 <Link
                   href={`/scenarios/${scenario.id}`}
                   aria-label={`Start training: ${scenario.name}`}
-                  className="block rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  className="block rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                 >
-                  <article className="flex h-full flex-col rounded-lg border border-border bg-card p-6 transition-colors duration-100 group-hover:bg-muted">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-secondary">
-                      <Icon
-                        className="h-5 w-5 text-secondary-foreground"
-                        aria-hidden="true"
-                      />
+                  <article className="flex h-full flex-col rounded-2xl border border-border/60 bg-card p-6 transition-all duration-150 group-hover:border-[#8F6AE0]/30 group-hover:shadow-md">
+                    {/* Tags */}
+                    <div className="flex flex-wrap gap-2">
+                      <span className="inline-flex items-center rounded-full bg-[#8F6AE0]/10 px-3 py-1 text-xs font-semibold text-[#8F6AE0]">
+                        {meta.label}
+                      </span>
                     </div>
 
-                    <div className="mt-4">
-                      <Badge>{meta.label}</Badge>
-                    </div>
-
-                    <h2 className="mt-2 text-lg font-medium leading-tight text-foreground">
+                    {/* Title */}
+                    <h2 className="mt-3 text-base font-bold leading-snug text-[#2B2339]">
                       {scenario.name}
                     </h2>
 
-                    {scenario.description && (
-                      <p className="mt-1.5 line-clamp-2 text-sm leading-relaxed text-muted-foreground">
-                        {scenario.description}
-                      </p>
-                    )}
+                    {/* Description — 1 line, truncate with ellipsis */}
+                    <p className="mt-2 truncate text-sm text-muted-foreground">
+                      {scenario.description ? scenario.description : `Practice handling a ${meta.label.toLowerCase()} scenario with an AI debtor`}
+                    </p>
 
-                    <div className="mt-auto flex items-center pt-5">
-                      <span className="inline-flex items-center gap-1.5 text-sm font-medium text-primary">
-                        Start training
-                        <ArrowRight
-                          className="h-4 w-4 transition-transform duration-100 group-hover:translate-x-0.5"
-                          aria-hidden="true"
-                        />
+                    {/* Start practice button */}
+                    <div className="mt-auto pt-5">
+                      <span className="flex h-11 w-full items-center justify-center rounded-full border border-border bg-transparent text-sm font-semibold text-muted-foreground transition-all group-hover:border-[#8F6AE0] group-hover:bg-[#8F6AE0] group-hover:text-white group-hover:shadow-lg group-hover:shadow-[#8F6AE0]/20">
+                        Start practice
                       </span>
                     </div>
                   </article>
