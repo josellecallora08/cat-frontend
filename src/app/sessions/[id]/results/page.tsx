@@ -7,7 +7,6 @@ import {
   useCoaching,
   useLearningPlan,
 } from "@/hooks/use-session-results";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
@@ -20,6 +19,8 @@ import {
   ArrowLeft,
 } from "lucide-react";
 import { CatMascotSvg } from "@/components/auth/CatMascotSvg";
+import { OrangeCatMascot } from "@/components/results/OrangeCatMascot";
+import type { CatEmotion } from "@/components/results/OrangeCatMascot";
 import confetti from "canvas-confetti";
 import type {
   EvaluationResult,
@@ -70,7 +71,7 @@ function scoreToneBar(s: number): string {
 // --- Loading screen with cat ---
 function CatLoading() {
   return (
-    <div className="flex min-h-[70vh] items-center justify-center">
+    <div className="flex h-screen items-center justify-center">
       <div className="flex flex-col items-center gap-4">
         <div className="w-20 h-20 animate-pulse">
           <CatMascotSvg className="w-full h-full" id="results-loader" />
@@ -90,16 +91,18 @@ function StepNav({
   totalSteps,
   onPrev,
   onNext,
+  onStepClick,
   nextLabel,
 }: {
   currentStep: number;
   totalSteps: number;
   onPrev: () => void;
   onNext: () => void;
+  onStepClick: (step: number) => void;
   nextLabel?: string;
 }) {
   return (
-    <div className="flex items-center justify-between pt-6">
+    <div className="flex items-center justify-between">
       <Button
         variant="outline"
         size="sm"
@@ -110,9 +113,19 @@ function StepNav({
         <ArrowLeft className="h-4 w-4" />
         Back
       </Button>
-      <span className="text-xs text-muted-foreground">
-        {currentStep + 1} / {totalSteps}
-      </span>
+      <div className="flex items-center gap-1.5">
+        {Array.from({ length: totalSteps }).map((_, i) => (
+          <button
+            key={i}
+            onClick={() => onStepClick(i)}
+            className={cn(
+              "h-2 rounded-full transition-all duration-300",
+              i === currentStep ? "w-6 bg-[#8F6AE0]" : "w-2 bg-[#8F6AE0]/20 hover:bg-[#8F6AE0]/40"
+            )}
+            aria-label={`Go to step ${i + 1}`}
+          />
+        ))}
+      </div>
       <Button size="sm" onClick={onNext} className="gap-1.5">
         {nextLabel ?? "Next"}
         <ArrowRight className="h-4 w-4" />
@@ -126,7 +139,6 @@ function EvaluationStep({ data }: { data: EvaluationResult }) {
   if (data.is_too_short) {
     return (
       <div className="space-y-4">
-        <h2 className="text-xl font-bold text-foreground">Evaluation</h2>
         <div className="rounded-xl border border-[#F59E0B]/30 bg-[#F59E0B]/5 p-5 text-center">
           <AlertTriangle className="mx-auto h-6 w-6 text-[#F59E0B]" />
           <p className="mt-2 text-sm font-medium text-foreground">Session too short</p>
@@ -140,10 +152,6 @@ function EvaluationStep({ data }: { data: EvaluationResult }) {
 
   return (
     <div className="space-y-5">
-      <div>
-        <h2 className="text-xl font-bold text-foreground">Evaluation</h2>
-        <p className="text-sm text-muted-foreground">Performance across key competencies</p>
-      </div>
       <div className="space-y-4">
         {data.category_scores.map((item: CompetencyScore) => (
           <div key={item.category} className="space-y-1.5">
@@ -173,7 +181,6 @@ function StrengthsStep({ data }: { data: EvaluationResult }) {
   if (!data.strengths || data.strengths.length === 0) {
     return (
       <div className="space-y-4">
-        <h2 className="text-xl font-bold text-foreground">Strengths</h2>
         <p className="text-sm text-muted-foreground">No specific strengths identified in this session.</p>
       </div>
     );
@@ -181,10 +188,6 @@ function StrengthsStep({ data }: { data: EvaluationResult }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2">
-        <ThumbsUp className="h-5 w-5 text-[#22C55E]" />
-        <h2 className="text-xl font-bold text-foreground">Strengths</h2>
-      </div>
       <ul className="space-y-3">
         {data.strengths.map((s, i) => (
           <li key={i} className="rounded-xl border border-[#22C55E]/20 bg-[#22C55E]/5 p-4">
@@ -209,12 +212,9 @@ function WeaknessesStep({ data }: { data: EvaluationResult }) {
   if (!data.weaknesses || data.weaknesses.length === 0) {
     return (
       <div className="space-y-4">
-        <div className="flex items-center gap-2">
-          <CheckCircle2 className="h-5 w-5 text-[#22C55E]" />
-          <h2 className="text-xl font-bold text-foreground">Areas for Improvement</h2>
-        </div>
         <div className="rounded-xl border border-[#22C55E]/30 bg-[#22C55E]/5 p-5 text-center">
-          <p className="text-sm font-medium text-foreground">Excellent work!</p>
+          <CheckCircle2 className="mx-auto h-6 w-6 text-[#22C55E]" />
+          <p className="mt-2 text-sm font-medium text-foreground">Excellent work!</p>
           <p className="mt-1 text-xs text-muted-foreground">No major areas for improvement identified.</p>
         </div>
       </div>
@@ -223,10 +223,6 @@ function WeaknessesStep({ data }: { data: EvaluationResult }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2">
-        <AlertTriangle className="h-5 w-5 text-[#EF4444]" />
-        <h2 className="text-xl font-bold text-foreground">Areas for Improvement</h2>
-      </div>
       <ul className="space-y-3">
         {data.weaknesses.map((w, i) => (
           <li key={i} className="rounded-xl border border-[#EF4444]/20 bg-[#EF4444]/5 p-4">
@@ -251,7 +247,6 @@ function CoachingStep({ data }: { data: CoachingReport }) {
   if (data.no_mistakes) {
     return (
       <div className="space-y-4">
-        <h2 className="text-xl font-bold text-foreground">Coaching Report</h2>
         <div className="rounded-xl border border-[#22C55E]/30 bg-[#22C55E]/5 p-5 text-center">
           <CheckCircle2 className="mx-auto h-6 w-6 text-[#22C55E]" />
           <p className="mt-2 text-sm font-medium text-foreground">Excellent work</p>
@@ -266,12 +261,9 @@ function CoachingStep({ data }: { data: CoachingReport }) {
   const categories = Object.keys(data.mistakes_by_category);
   return (
     <div className="space-y-4">
-      <div>
-        <h2 className="text-xl font-bold text-foreground">Coaching Report</h2>
-        <p className="text-sm text-muted-foreground">
-          {data.total_mistakes} improvement {data.total_mistakes === 1 ? "opportunity" : "opportunities"} identified
-        </p>
-      </div>
+      <p className="text-sm text-muted-foreground">
+        {data.total_mistakes} improvement {data.total_mistakes === 1 ? "opportunity" : "opportunities"} identified
+      </p>
       <div className="space-y-4">
         {categories.map((category) => {
           const mistakes = data.mistakes_by_category[category];
@@ -313,7 +305,6 @@ function LearningPlanStep({ data }: { data: LearningPlan }) {
   if (data.all_passing) {
     return (
       <div className="space-y-4">
-        <h2 className="text-xl font-bold text-foreground">Learning Plan</h2>
         <div className="rounded-xl border border-[#22C55E]/30 bg-[#22C55E]/5 p-5 text-center">
           <Trophy className="mx-auto h-6 w-6 text-[#22C55E]" />
           <p className="mt-2 text-sm font-medium text-foreground">All competencies passing</p>
@@ -327,10 +318,6 @@ function LearningPlanStep({ data }: { data: LearningPlan }) {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h2 className="text-xl font-bold text-foreground">Learning Plan</h2>
-        <p className="text-sm text-muted-foreground">Recommended scenarios to strengthen weak areas</p>
-      </div>
       <ul className="space-y-3">
         {data.weak_competencies.map((item: LearningPlanItem) => (
           <li
@@ -381,7 +368,6 @@ function OverallScoreStep({ data }: { data: EvaluationResult }) {
 
   return (
     <div className="space-y-6 text-center">
-      <h2 className="text-xl font-bold text-foreground">Overall Score</h2>
       <div>
         <p className={cn("text-6xl font-bold leading-none", scoreToneText(overall ?? 0))}>
           {Math.round(overall ?? 0)}
@@ -398,10 +384,16 @@ function OverallScoreStep({ data }: { data: EvaluationResult }) {
           <p className="mt-1 text-xs text-muted-foreground">You passed this session.</p>
         </div>
       ) : (
-        <div className="rounded-xl border border-[#F59E0B]/30 bg-[#F59E0B]/5 p-4">
-          <AlertTriangle className="mx-auto h-6 w-6 text-[#F59E0B]" />
-          <p className="mt-2 text-sm font-medium text-[#F59E0B]">Keep practicing</p>
-          <p className="mt-1 text-xs text-muted-foreground">Review coaching recommendations and try again.</p>
+        <div className="flex justify-center">
+          <div className="flex items-center gap-4 rounded-xl border border-[#F59E0B]/30 bg-[#F59E0B]/5 px-5 py-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#F59E0B]">
+              <AlertTriangle className="h-5 w-5 text-white" />
+            </div>
+            <div className="text-left">
+              <p className="text-sm font-medium text-[#F59E0B]">Keep practicing</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">Review coaching recommendations and try again.</p>
+            </div>
+          </div>
         </div>
       )}
     </div>
@@ -415,22 +407,16 @@ function SummaryStep({ sessionId, data, coaching, learningPlan }: { sessionId: s
   const total = data.category_scores.length;
 
   return (
-    <div className="space-y-6 -mx-6 -mt-6 -mb-6">
-      {/* Header */}
-      <div className="px-6 pt-6 text-center">
-        <h2 className="text-xl font-bold text-foreground">Session Complete</h2>
-        <p className="mt-1 text-sm text-muted-foreground">Here&apos;s your full performance breakdown</p>
-      </div>
-
+    <div className="space-y-4 w-full max-w-2xl mx-auto">
       {/* Bento grid */}
-      <div className="px-4 pb-6 grid grid-cols-2 gap-3">
-        {/* Overall score — spans full width, no bg/border */}
-        <div className="col-span-2 p-5 text-center">
+      <div className="grid grid-cols-2 gap-3">
+        {/* Overall score — spans full width */}
+        <div className="col-span-2 p-3 text-center">
           <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Overall Score</p>
-          <p className={cn("mt-1 text-5xl font-bold leading-none", scoreToneText(overall ?? 0))}>
-            {Math.round(overall ?? 0)}<span className="text-lg font-medium text-muted-foreground">/100</span>
+          <p className={cn("mt-1 text-4xl font-bold leading-none", scoreToneText(overall ?? 0))}>
+            {Math.round(overall ?? 0)}<span className="text-base font-medium text-muted-foreground">/100</span>
           </p>
-          <p className="mt-2 text-xs text-muted-foreground">{passing} of {total} competencies passing</p>
+          <p className="mt-1 text-xs text-muted-foreground">{passing} of {total} competencies passing</p>
         </div>
 
         {/* Category scores — each in its own cell, no bg/border */}
@@ -579,45 +565,54 @@ export default function SessionResultsPage({
   const goNext = () => setStep((s) => Math.min(s + 1, TOTAL_STEPS - 1));
   const goPrev = () => setStep((s) => Math.max(s - 1, 0));
 
-  return (
-    <div className="mx-auto max-w-full py-6">
-      {/* Step progress dots */}
-      <div className="flex justify-center gap-1.5 mb-6">
-        {Array.from({ length: TOTAL_STEPS }).map((_, i) => (
-          <button
-            key={i}
-            onClick={() => setStep(i)}
-            className={cn(
-              "h-2 rounded-full transition-all duration-300",
-              i === step ? "w-6 bg-[#8F6AE0]" : "w-2 bg-[#8F6AE0]/20"
-            )}
-            aria-label={`Step ${i + 1}`}
-          />
-        ))}
-      </div>
+  // Map step index to cat emotion
+  const stepEmotions: CatEmotion[] = [
+    "neutral",      // 0: Evaluation scores
+    "happy",        // 1: Strengths
+    "worried",      // 2: Weaknesses
+    "thinking",     // 3: Coaching
+    "encouraging",  // 4: Learning plan
+    (evaluation.data.overall_score ?? 0) >= 70 ? "celebrating" : "encouraging", // 5: Overall score
+    "proud",        // 6: Summary
+  ];
 
-      {/* Step content with transition */}
-      <div
-        key={step}
-        className={cn(
-          "animate-in fade-in-0 slide-in-from-right-4 duration-300",
-          step < 6 && "max-w-lg mx-auto"
-        )}
-      >
-        <Card>
-          <CardContent className="p-6">
+  // Step titles and descriptions
+  const stepMeta: { title: string; description: string }[] = [
+    { title: "Evaluation", description: "Performance across key competencies" },
+    { title: "Strengths", description: "What you did well in this session" },
+    { title: "Areas for Improvement", description: "Opportunities to grow" },
+    { title: "Coaching Report", description: "Detailed feedback on mistakes" },
+    { title: "Learning Plan", description: "Recommended practice scenarios" },
+    { title: "Overall Score", description: "Your final performance rating" },
+    { title: "Session Complete", description: "Full performance breakdown" },
+  ];
+
+  // Steps that have short content and can fit in 1 centered div
+  const isCompactStep = step === 0 || step === 1 || step === 4 || step === 5;
+
+  return (
+    <div className="flex flex-col h-screen py-6 px-4 overflow-hidden">
+      {isCompactStep ? (
+        /* Compact steps: everything in one vertically-centered div */
+        <div
+          key={step}
+          className={cn(
+            "flex-1 flex flex-col justify-center items-center animate-in fade-in-0 slide-in-from-right-4 duration-300 w-full",
+            step < 6 && "max-w-lg mx-auto"
+          )}
+        >
+          <h2 className="text-xl md:text-2xl font-bold text-foreground text-center">
+            {stepMeta[step].title}
+          </h2>
+          <p className="text-sm text-muted-foreground text-center mt-1 mb-3">
+            {stepMeta[step].description}
+          </p>
+          <div className="flex justify-center mb-3">
+            <OrangeCatMascot emotion={stepEmotions[step]} className="w-16 h-16 md:w-20 md:h-20" />
+          </div>
+          <div className="w-full">
             {step === 0 && <EvaluationStep data={evaluation.data} />}
             {step === 1 && <StrengthsStep data={evaluation.data} />}
-            {step === 2 && <WeaknessesStep data={evaluation.data} />}
-            {step === 3 && (
-              coaching.isError ? (
-                <ErrorState title="coaching report" error={coaching.error} onRetry={() => coaching.refetch()} />
-              ) : coaching.data ? (
-                <CoachingStep data={coaching.data} />
-              ) : (
-                <p className="text-sm text-muted-foreground text-center py-8">Coaching data not available yet.</p>
-              )
-            )}
             {step === 4 && (
               learningPlan.isError ? (
                 <ErrorState title="learning plan" error={learningPlan.error} onRetry={() => learningPlan.refetch()} />
@@ -628,21 +623,52 @@ export default function SessionResultsPage({
               )
             )}
             {step === 5 && <OverallScoreStep data={evaluation.data} />}
-            {step === 6 && <SummaryStep sessionId={id} data={evaluation.data} coaching={coaching.data ?? null} learningPlan={learningPlan.data ?? null} />}
-
-            {/* Navigation */}
-            {step < TOTAL_STEPS - 1 && (
-              <StepNav
-                currentStep={step}
-                totalSteps={TOTAL_STEPS}
-                onPrev={goPrev}
-                onNext={goNext}
-                nextLabel={step === TOTAL_STEPS - 2 ? "View Summary" : "Next"}
-              />
+          </div>
+        </div>
+      ) : (
+        /* Content-heavy steps: fixed header + scrollable content */
+        <>
+          <h2 className="text-xl md:text-2xl font-bold text-foreground text-center shrink-0">
+            {stepMeta[step].title}
+          </h2>
+          <p className="text-sm text-muted-foreground text-center mt-1 mb-3 shrink-0">
+            {stepMeta[step].description}
+          </p>
+          <div className="flex justify-center mb-3 shrink-0">
+            <OrangeCatMascot emotion={stepEmotions[step]} className="w-16 h-16 md:w-20 md:h-20" />
+          </div>
+          <div
+            key={step}
+            className="flex-1 overflow-y-auto animate-in fade-in-0 slide-in-from-right-4 duration-300 w-full max-w-lg mx-auto"
+          >
+            {step === 2 && <WeaknessesStep data={evaluation.data} />}
+            {step === 3 && (
+              coaching.isError ? (
+                <ErrorState title="coaching report" error={coaching.error} onRetry={() => coaching.refetch()} />
+              ) : coaching.data ? (
+                <CoachingStep data={coaching.data} />
+              ) : (
+                <p className="text-sm text-muted-foreground text-center py-8">Coaching data not available yet.</p>
+              )
             )}
-          </CardContent>
-        </Card>
-      </div>
+            {step === 6 && <SummaryStep sessionId={id} data={evaluation.data} coaching={coaching.data ?? null} learningPlan={learningPlan.data ?? null} />}
+          </div>
+        </>
+      )}
+
+      {/* Navigation — pinned at bottom */}
+      {step < TOTAL_STEPS - 1 && (
+        <div className="max-w-lg mx-auto w-full pt-4 shrink-0">
+          <StepNav
+            currentStep={step}
+            totalSteps={TOTAL_STEPS}
+            onPrev={goPrev}
+            onNext={goNext}
+            onStepClick={setStep}
+            nextLabel={step === TOTAL_STEPS - 2 ? "View Summary" : "Next"}
+          />
+        </div>
+      )}
     </div>
   );
 }

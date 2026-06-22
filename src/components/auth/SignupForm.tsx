@@ -1,19 +1,17 @@
 "use client";
 
-import { useRef, useState, useCallback } from "react";
-import type { AuthStatus, AuthFieldErrors, PasswordStrength } from "@/lib/auth/types";
-import { getPasswordStrength } from "@/lib/auth/validation";
+import { useRef, useCallback } from "react";
+import type { AuthStatus, AuthFieldErrors } from "@/lib/auth/types";
 import { AuthInput } from "./AuthInput";
 import { PasswordInput } from "./PasswordInput";
 import { PrimaryAuthButton } from "./PrimaryAuthButton";
-import { PasswordRules } from "./PasswordRules";
 import { AuthSwitchLink } from "./AuthSwitchLink";
 
 interface SignupFormProps {
   status: AuthStatus;
   fieldErrors: AuthFieldErrors;
   buttonMessage: string;
-  onSubmit: (email: string, password: string) => void;
+  onSubmit: (email: string, password: string, fullName: string) => void;
   onLogin: () => void;
   onFieldChange: () => void;
 }
@@ -26,28 +24,21 @@ export function SignupForm({
   onLogin,
   onFieldChange,
 }: SignupFormProps) {
+  const firstNameRef = useRef<HTMLInputElement>(null);
+  const lastNameRef = useRef<HTMLInputElement>(null);
   const emailRef = useRef<HTMLInputElement>(null);
   const passwordRef = useRef<HTMLInputElement>(null);
   const isSubmitting = status === "submitting";
 
-  const [strength, setStrength] = useState<PasswordStrength>({
-    length: false,
-    uppercase: false,
-    number: false,
-  });
-
-  const handlePasswordChange = useCallback(() => {
-    const val = passwordRef.current?.value ?? "";
-    setStrength(getPasswordStrength(val));
-    onFieldChange();
-  }, [onFieldChange]);
-
   const handleSubmit = useCallback(
     (e: React.FormEvent) => {
       e.preventDefault();
+      const firstName = firstNameRef.current?.value.trim() ?? "";
+      const lastName = lastNameRef.current?.value.trim() ?? "";
       const email = emailRef.current?.value ?? "";
       const password = passwordRef.current?.value ?? "";
-      onSubmit(email, password);
+      const fullName = `${firstName} ${lastName}`.trim();
+      onSubmit(email, password, fullName);
     },
     [onSubmit]
   );
@@ -59,6 +50,33 @@ export function SignupForm({
         noValidate
         className="w-full grid gap-2 md:gap-[14px]"
       >
+        <div className="grid grid-cols-2 gap-2">
+          <AuthInput
+            ref={firstNameRef}
+            id="signup-firstname"
+            type="text"
+            label="First name"
+            placeholder="First name"
+            autoComplete="given-name"
+            hasError={!!fieldErrors.firstName}
+            errorId="signup-firstname-error"
+            disabled={isSubmitting}
+            onChange={onFieldChange}
+          />
+          <AuthInput
+            ref={lastNameRef}
+            id="signup-lastname"
+            type="text"
+            label="Last name"
+            placeholder="Last name"
+            autoComplete="family-name"
+            hasError={!!fieldErrors.lastName}
+            errorId="signup-lastname-error"
+            disabled={isSubmitting}
+            onChange={onFieldChange}
+          />
+        </div>
+
         <AuthInput
           ref={emailRef}
           id="signup-email"
@@ -85,9 +103,8 @@ export function SignupForm({
             errorId="signup-password-error"
             aria-errormessage={fieldErrors.password}
             disabled={isSubmitting}
-            onChange={handlePasswordChange}
+            onChange={onFieldChange}
           />
-          <PasswordRules strength={strength} />
         </div>
 
         <PrimaryAuthButton

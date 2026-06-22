@@ -117,23 +117,42 @@
   html {
     @apply font-sans;
   }
-  /* Ensure pointer cursor on all interactive elements globally */
-  button,
-  [role="button"],
-  [role="tab"],
-  [role="menuitem"],
-  [role="option"],
-  [role="radio"],
-  [role="checkbox"],
-  select,
-  label[for],
-  a[href],
-  input[type="checkbox"],
-  input[type="radio"],
-  input[type="submit"],
-  input[type="button"],
-  input[type="file"],
-  input[type="range"] {
-    cursor: pointer;
-  }
+}
+
+/* Scrollbar: thumb only, hidden by default, appears on scroll, 50% thinner */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+*:hover,
+*:active,
+*:focus-within {
+  scrollbar-color: rgba(0, 0, 0, 0.2) transparent;
+}
+
+/* Webkit (Chrome, Safari, Edge) */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+  background: transparent;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 4px;
+  transition: background 0.3s;
+}
+
+/* Show thumb only when scrolling (hover on scrollable container) */
+*:hover::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+*:active::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.35);
 }

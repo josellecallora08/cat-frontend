@@ -36,10 +36,17 @@ export const PasswordInput = forwardRef<HTMLInputElement, PasswordInputProps>(
           />
           {hasError && (
             <span
-              className="absolute right-[70px] md:right-[86px] top-1/2 -translate-y-1/2 z-[2] w-4 h-4 md:w-[18px] md:h-[18px] grid place-items-center rounded-full bg-[#F05B72] text-white text-[11px] md:text-xs font-extrabold pointer-events-none"
-              aria-hidden="true"
+              className="group absolute right-[70px] md:right-[86px] top-1/2 -translate-y-1/2 z-[2] w-4 h-4 md:w-[18px] md:h-[18px] grid place-items-center rounded-full bg-[#F05B72] text-white text-[11px] md:text-xs font-extrabold cursor-help"
+              aria-label="Password requirements"
             >
               !
+              <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-[180px] rounded-lg bg-[#2B2339] px-3 py-2 text-[10px] md:text-[11px] font-medium text-white leading-relaxed opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 pointer-events-none shadow-lg">
+                Password must have:
+                <br />• At least 8 characters
+                <br />• One uppercase letter
+                <br />• One number
+                <span className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-[#2B2339]" />
+              </span>
             </span>
           )}
           <button
