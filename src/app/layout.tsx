@@ -4,6 +4,7 @@ import "./globals.css";
 import { AppProviders } from "@/components/providers";
 import { AuthGuard } from "@/components/auth-guard";
 import { AppShell } from "@/components/app-shell";
+import { DashboardReveal } from "@/components/auth/DashboardReveal";
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
@@ -31,6 +32,7 @@ export default function RootLayout({
           <AuthGuard>
             <AppShell>{children}</AppShell>
           </AuthGuard>
+          <DashboardReveal />
         </AppProviders>
       </body>
     </html>
