@@ -14,13 +14,13 @@ import { LoginForm } from "./LoginForm";
 import { SignupForm } from "./SignupForm";
 import { ResetPasswordForm } from "./ResetPasswordForm";
 
-type AppPhase = "loading" | "auth";
+type AppPhase = "auth" | "loading";
 type AuthStep = "roleSelect" | "form";
 type UserRole = "admin" | "agent";
 
 export function AuthShell() {
   const router = useRouter();
-  const [phase, setPhase] = useState<AppPhase>("loading");
+  const [phase, setPhase] = useState<AppPhase>("auth");
   const [step, setStep] = useState<AuthStep>("roleSelect");
   const [selectedRole, setSelectedRole] = useState<UserRole>("agent");
   const [view, setView] = useState<AuthView>("login");
@@ -33,55 +33,12 @@ export function AuthShell() {
   const mascotRef = useRef<HTMLDivElement>(null);
   const starsRef = useRef<HTMLDivElement>(null);
 
-  // Circular wipe reveal when loader completes
+  // After login, the loader plays then navigates to dashboard
   const handleLoaderComplete = useCallback(() => {
-    const page = authPageRef.current;
-    if (!page) {
-      setPhase("auth");
-      return;
-    }
-
-    const prefersReduced =
-      typeof window !== "undefined" &&
-      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-
-    if (prefersReduced) {
-      setPhase("auth");
-      return;
-    }
-
-    // Reveal with circular wipe from center
-    const cx = window.innerWidth / 2;
-    const cy = window.innerHeight * 0.35;
-    const maxRadius = Math.hypot(
-      Math.max(cx, window.innerWidth - cx),
-      Math.max(cy, window.innerHeight - cy)
-    );
-
-    page.style.clipPath = `circle(0px at ${cx}px ${cy}px)`;
-    page.style.pointerEvents = "none";
-    setPhase("auth");
-
-    gsap.to(page, {
-      clipPath: `circle(${maxRadius * 1.35}px at ${cx}px ${cy}px)`,
-      duration: 0.72,
-      ease: "power3.inOut",
-      onComplete: () => {
-        page.style.clipPath = "none";
-        page.style.pointerEvents = "auto";
-      },
-    });
-
-    // Fade in content
-    const content = page.querySelector(".auth-content");
-    if (content) {
-      gsap.fromTo(
-        content,
-        { autoAlpha: 0, y: 16, scale: 0.98 },
-        { autoAlpha: 1, y: 0, scale: 1, duration: 0.36, delay: 0.46, ease: "power2.out" }
-      );
-    }
-  }, []);
+    // Signal the dashboard to play the reveal animation
+    sessionStorage.setItem("cat_reveal_dashboard", "1");
+    router.push("/");
+  }, [router]);
 
   // Clear errors when user edits a field
   const handleFieldChange = useCallback(() => {
@@ -138,9 +95,9 @@ export function AuthShell() {
       setStatus("success");
       playSuccessAnimation();
 
-      // Navigate after a brief moment
+      // Show loading screen, then navigate to dashboard
       setTimeout(() => {
-        router.push("/");
+        setPhase("loading");
       }, 1200);
     },
     [router]
@@ -260,10 +217,10 @@ export function AuthShell() {
 
   return (
     <>
-      {/* Loading phase */}
+      {/* Loading phase — shown AFTER successful login, before dashboard */}
       {phase === "loading" && <MascotLoader onComplete={handleLoaderComplete} />}
 
-      {/* Auth page (always rendered for clip-path reveal, hidden visually during loading) */}
+      {/* Auth page (role select + login form) — shown immediately */}
       <div
         ref={authPageRef}
         className="fixed inset-0 z-[55] grid place-items-center overflow-auto"
