@@ -117,4 +117,23 @@
   html {
     @apply font-sans;
   }
+  /* Ensure pointer cursor on all interactive elements globally */
+  button,
+  [role="button"],
+  [role="tab"],
+  [role="menuitem"],
+  [role="option"],
+  [role="radio"],
+  [role="checkbox"],
+  select,
+  label[for],
+  a[href],
+  input[type="checkbox"],
+  input[type="radio"],
+  input[type="submit"],
+  input[type="button"],
+  input[type="file"],
+  input[type="range"] {
+    cursor: pointer;
+  }
 }
