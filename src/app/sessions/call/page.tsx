@@ -15,6 +15,7 @@ import {
 import { useSessionStore } from "@/stores/session-store";
 import { useScenario } from "@/hooks/use-scenarios";
 import { cn } from "@/lib/utils";
+import gsap from "gsap";
 import {
   Mic,
   PhoneOff,
@@ -25,6 +26,7 @@ import {
   Target,
   CircleDollarSign,
   CalendarClock,
+  X,
 } from "lucide-react";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
@@ -88,6 +90,7 @@ function CallPageContent() {
   const [transcript, setTranscript] = useState<TranscriptItem[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [infoOpen, setInfoOpen] = useState(false);
   const [continuousMode, setContinuousMode] = useState(true);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const transcriptEndRef = useRef<HTMLDivElement>(null);
@@ -96,7 +99,7 @@ function CallPageContent() {
 
   useEffect(() => {
     transcriptEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [transcript]);
+  }, [transcript, status]);
 
   const speakText = useCallback((text: string): Promise<void> => {
     return new Promise(async (resolve) => {
@@ -332,8 +335,11 @@ function CallPageContent() {
 
   if (!sessionId) {
     return (
-      <div className="flex min-h-[60vh] items-center justify-center">
-        <div role="alert" className="flex flex-col items-center text-center">
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center p-4"
+        style={{ background: "radial-gradient(ellipse at center, #1e1530 0%, #0d0a17 100%)" }}
+      >
+        <div role="alert" className="flex w-full max-w-sm flex-col items-center rounded-2xl border border-border bg-card px-8 py-10 text-center shadow-2xl shadow-black/40">
           <div className="flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10">
             <AlertCircle className="h-6 w-6 text-destructive" aria-hidden="true" />
           </div>
@@ -350,215 +356,286 @@ function CallPageContent() {
   const initial = personaName.charAt(0).toUpperCase();
   const { label, dot, pulse } = statusConfig[status];
 
+  // GSAP entrance — fades in smoothly from the dark ringing screen
+  const pageRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!pageRef.current) return;
+    gsap.fromTo(
+      pageRef.current,
+      { opacity: 0 },
+      { opacity: 1, duration: 0.5, ease: "power2.out" }
+    );
+  }, []);
+
   return (
-    <div className="mx-auto flex w-full max-w-4xl flex-col items-start justify-center gap-6 lg:flex-row">
-      {/* Scenario reference — outside the phone */}
+    <div
+      ref={pageRef}
+      className="fixed inset-0 z-50 flex items-center justify-center gap-6 p-4"
+      style={{ background: "radial-gradient(ellipse at center, #1e1530 0%, #0d0a17 100%)" }}
+    >
+      {/* Scenario reference — always-visible "call brief" beside the phone (desktop) */}
       {scenario && (
-        <aside className="w-full lg:w-72 lg:shrink-0">
-          <div className="rounded-xl border border-border bg-card">
-            <div className="flex items-center gap-1.5 border-b border-border px-4 py-3">
-              <Info className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-              <h2 className="text-sm font-medium text-foreground">
-                Scenario reference
-              </h2>
+        <aside className="hidden h-[calc(100vh-2rem)] max-h-[760px] w-80 shrink-0 flex-col overflow-hidden rounded-2xl border border-white/10 bg-card/95 shadow-2xl shadow-black/40 backdrop-blur lg:flex">
+          <div className="flex items-center gap-2 border-b border-border px-5 py-4">
+            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10">
+              <Target className="h-4 w-4 text-primary" aria-hidden="true" />
             </div>
-            <div className="px-4 py-3">
-              <p className="text-sm font-medium leading-tight text-foreground">
-                {scenario.name}
+            <div>
+              <h2 className="text-sm font-semibold leading-tight text-foreground">Your call brief</h2>
+              <p className="text-[11px] leading-tight text-muted-foreground">{scenario.name}</p>
+            </div>
+          </div>
+
+          <div className="flex-1 space-y-4 overflow-y-auto px-5 py-4">
+            {/* Primary focus — the goal, front and center */}
+            <div className="rounded-xl border border-primary/20 bg-primary/5 p-3.5">
+              <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-primary">
+                <Target className="h-3.5 w-3.5" aria-hidden="true" />
+                Your goal
               </p>
-              <dl className="mt-3 space-y-3">
-                <div className="flex items-center gap-2">
-                  <CircleDollarSign
-                    className="h-4 w-4 shrink-0 text-muted-foreground"
-                    aria-hidden="true"
-                  />
-                  <dt className="sr-only">Outstanding balance</dt>
-                  <dd className="text-sm text-foreground">
-                    <span className="font-medium">
-                      {formatPHP(scenario.debtor_profile.outstanding_balance)}
-                    </span>{" "}
-                    <span className="text-muted-foreground">outstanding</span>
-                  </dd>
-                </div>
-                <div className="flex items-center gap-2">
-                  <CalendarClock
-                    className="h-4 w-4 shrink-0 text-muted-foreground"
-                    aria-hidden="true"
-                  />
-                  <dt className="sr-only">Days past due</dt>
-                  <dd className="text-sm text-muted-foreground">
-                    {scenario.debtor_profile.days_past_due} days past due
-                  </dd>
-                </div>
-                <div className="border-t border-border pt-3">
-                  <dt className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-                    <Target className="h-3.5 w-3.5" aria-hidden="true" />
-                    Conversation goal
-                  </dt>
-                  <dd className="mt-1 text-sm leading-relaxed text-foreground">
-                    {scenario.debtor_profile.conversation_goal}
-                  </dd>
-                </div>
-                <div className="border-t border-border pt-3">
-                  <dt className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-                    <User className="h-3.5 w-3.5" aria-hidden="true" />
-                    Personality
-                  </dt>
-                  <dd className="mt-1 text-sm leading-relaxed text-muted-foreground">
-                    {scenario.debtor_profile.personality_profile}
-                  </dd>
-                </div>
-              </dl>
+              <p className="mt-1.5 text-sm font-medium leading-relaxed text-foreground">
+                {scenario.debtor_profile.conversation_goal}
+              </p>
+            </div>
+
+            {/* Hard numbers — quick-glance stat chips */}
+            <div className="grid grid-cols-2 gap-2.5">
+              <div className="rounded-xl border border-border bg-muted/40 p-3">
+                <CircleDollarSign className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                <p className="mt-1.5 text-base font-semibold leading-none text-foreground">
+                  {formatPHP(scenario.debtor_profile.outstanding_balance)}
+                </p>
+                <p className="mt-1 text-[11px] text-muted-foreground">Outstanding</p>
+              </div>
+              <div className="rounded-xl border border-border bg-muted/40 p-3">
+                <CalendarClock className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                <p className="mt-1.5 text-base font-semibold leading-none text-foreground">
+                  {scenario.debtor_profile.days_past_due} days
+                </p>
+                <p className="mt-1 text-[11px] text-muted-foreground">Past due</p>
+              </div>
+            </div>
+
+            {/* Who you're talking to — supporting context */}
+            <div className="rounded-xl border border-border bg-muted/40 p-3.5">
+              <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                <User className="h-3.5 w-3.5" aria-hidden="true" />
+                Who you&apos;re talking to
+              </p>
+              <p className="mt-1.5 text-sm leading-relaxed text-foreground">
+                {scenario.debtor_profile.personality_profile}
+              </p>
             </div>
           </div>
         </aside>
       )}
 
-      {/* Phone frame */}
-      <div className="mx-auto w-full max-w-sm lg:mx-0">
-        <div className="flex h-[calc(100vh-3.5rem-3rem)] flex-col overflow-hidden rounded-[2rem] border border-border bg-card shadow-lg">
-          {/* Caller header — gradient uses palette purples */}
-          <div className="relative bg-gradient-to-b from-secondary to-card px-5 pb-5 pt-6">
-            <div className="flex flex-col items-center text-center">
-              <div className="flex h-20 w-20 items-center justify-center rounded-full bg-primary/15 text-2xl font-semibold text-primary">
-                {initial}
-              </div>
-              <h1 className="mt-3 text-xl font-medium leading-tight text-foreground">
-                {personaName}
-              </h1>
-              <div
-                role="status"
-                aria-live="polite"
-                className="mt-1.5 inline-flex items-center gap-2"
-              >
-                <span className="relative flex h-2 w-2" aria-hidden="true">
-                  {pulse && (
-                    <span
-                      className={cn(
-                        "absolute inline-flex h-full w-full animate-ping rounded-full opacity-60 motion-reduce:animate-none",
-                        dot
-                      )}
-                    />
-                  )}
-                  <span className={cn("relative inline-flex h-2 w-2 rounded-full", dot)} />
-                </span>
-                <span className="text-sm text-muted-foreground">
-                  {label} · {elapsed}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Transcript */}
-          <div
-            aria-live="polite"
-            aria-label="Call transcript"
-            className="flex-1 space-y-3 overflow-y-auto border-t border-border bg-muted/30 px-4 py-4"
-          >
-            {transcript.length === 0 && (
-              <p className="py-8 text-center text-sm text-muted-foreground">
-                {personaName} is answering the phone…
-              </p>
-            )}
-            {transcript.map((item, i) => {
-              if (item.system) {
-                return (
-                  <p key={i} className="py-1 text-center text-xs font-medium text-muted-foreground">
-                    {item.text}
-                  </p>
-                );
-              }
-              const isAgent = item.speaker === "agent";
-              return (
-                <div key={i} className={cn("flex", isAgent ? "justify-end" : "justify-start")}>
-                  <div className="max-w-[85%]">
-                    <p
-                      className={cn(
-                        "mb-1 text-[11px] font-medium text-muted-foreground",
-                        isAgent && "text-right"
-                      )}
-                    >
-                      {isAgent ? "You" : personaName}
-                    </p>
-                    <div
-                      className={cn(
-                        "rounded-2xl px-3.5 py-2 text-sm leading-relaxed",
-                        isAgent
-                          ? "rounded-br-sm bg-primary text-primary-foreground"
-                          : "rounded-bl-sm border border-border bg-card text-foreground"
-                      )}
-                    >
-                      {item.text}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-            <div ref={transcriptEndRef} />
-          </div>
-
-          {/* Inline error */}
-          {error && (
-            <p
-              role="alert"
-              className="flex items-center justify-center gap-1.5 border-t border-border bg-destructive/5 px-4 py-2 text-xs text-destructive"
+      {/* Phone frame — identical dimensions to the ringing screen for a seamless hand-off */}
+      <div className="relative flex h-[calc(100vh-2rem)] max-h-[760px] w-full max-w-sm flex-col overflow-hidden rounded-[2rem] border border-border bg-card shadow-2xl shadow-black/40">
+        {/* Caller header — gradient uses palette purples */}
+        <div className="relative bg-gradient-to-b from-secondary to-card px-5 pb-5 pt-8">
+          {/* Scenario info toggle — only on smaller screens where the side panel is hidden */}
+          {scenario && (
+            <button
+              onClick={() => setInfoOpen((v) => !v)}
+              aria-label={infoOpen ? "Hide scenario details" : "Show scenario details"}
+              aria-pressed={infoOpen}
+              className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-full bg-card/60 text-muted-foreground backdrop-blur transition-colors hover:bg-card hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 lg:hidden"
             >
-              <AlertCircle className="h-3.5 w-3.5" aria-hidden="true" />
-              {error}
-            </p>
+              <Info className="h-4 w-4" aria-hidden="true" />
+            </button>
           )}
 
-          {/* Phone controls */}
-          <div className="border-t border-border bg-card px-5 py-4">
-            {!isEnded ? (
-              <div className="flex items-center justify-center gap-6">
-                <button
-                  onClick={startListening}
-                  disabled={status !== "active"}
-                  aria-pressed={status === "listening"}
-                  aria-label={status === "listening" ? "Listening" : "Tap to speak"}
-                  className={cn(
-                    "flex h-16 w-16 items-center justify-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50",
-                    status === "listening"
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-secondary text-secondary-foreground hover:bg-primary/15"
-                  )}
-                >
-                  {status === "processing" ? (
-                    <Loader2 className="h-6 w-6 animate-spin" aria-hidden="true" />
-                  ) : (
-                    <Mic className="h-6 w-6" aria-hidden="true" />
-                  )}
-                </button>
+          <div className="flex flex-col items-center text-center">
+            <div className="relative flex items-center justify-center">
+              {/* Pulsing rings while the debtor speaks — shows who has the floor */}
+              {status === "speaking" && (
+                <>
+                  <span className="absolute h-20 w-20 animate-ping rounded-full bg-primary/30 motion-reduce:hidden" />
+                  <span className="absolute h-24 w-24 animate-pulse rounded-full border border-primary/30 motion-reduce:hidden" />
+                </>
+              )}
+              <div
+                className={cn(
+                  "relative flex h-20 w-20 items-center justify-center rounded-full bg-primary/15 text-2xl font-semibold text-primary transition-transform duration-300",
+                  status === "speaking" && "scale-105"
+                )}
+              >
+                {initial}
+              </div>
+            </div>
+            <h1 className="mt-3 text-xl font-medium leading-tight text-foreground">
+              {personaName}
+            </h1>
+            <div
+              role="status"
+              aria-live="polite"
+              className="mt-1.5 inline-flex items-center gap-2"
+            >
+              <span className="relative flex h-2 w-2" aria-hidden="true">
+                {pulse && (
+                  <span
+                    className={cn(
+                      "absolute inline-flex h-full w-full animate-ping rounded-full opacity-60 motion-reduce:animate-none",
+                      dot
+                    )}
+                  />
+                )}
+                <span className={cn("relative inline-flex h-2 w-2 rounded-full", dot)} />
+              </span>
+              <span className="text-sm text-muted-foreground">
+                {label} · {elapsed}
+              </span>
+            </div>
+          </div>
+        </div>
 
-                <button
-                  onClick={() => setConfirmOpen(true)}
-                  aria-label="End call"
-                  className="flex h-16 w-16 items-center justify-center rounded-full bg-destructive text-white transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive focus-visible:ring-offset-2"
-                >
-                  <PhoneOff className="h-6 w-6" aria-hidden="true" />
-                </button>
-              </div>
-            ) : (
-              <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-                Call ended. Generating your evaluation…
-              </div>
-            )}
-            {!isEnded && (
-              <p className="mt-3 text-center text-xs text-muted-foreground">
-                {status === "listening"
-                  ? "Listening — speak naturally"
-                  : status === "active"
-                  ? continuousMode ? "Ready — speak anytime" : "Tap mic to speak"
-                  : status === "processing"
-                  ? "Thinking…"
-                  : status === "speaking"
-                  ? `${personaName} is speaking…`
-                  : ""}
+        {/* Transcript */}
+        <div
+          aria-live="polite"
+          aria-label="Call transcript"
+          className="flex-1 space-y-3 overflow-y-auto border-t border-border bg-muted/30 px-4 py-4"
+        >
+          {transcript.length === 0 && (
+            <div className="flex flex-col items-center gap-2 py-10 text-center">
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" aria-hidden="true" />
+              <p className="text-sm text-muted-foreground">
+                Connecting you with {personaName}…
               </p>
-            )}
-            {!isEnded && (
+            </div>
+          )}
+          {transcript.map((item, i) => {
+            if (item.system) {
+              return (
+                <p key={i} className="py-1 text-center text-xs font-medium text-muted-foreground">
+                  {item.text}
+                </p>
+              );
+            }
+            const isAgent = item.speaker === "agent";
+            return (
+              <div key={i} className={cn("flex", isAgent ? "justify-end" : "justify-start")}>
+                <div className="max-w-[85%]">
+                  <p
+                    className={cn(
+                      "mb-1 text-[11px] font-medium text-muted-foreground",
+                      isAgent && "text-right"
+                    )}
+                  >
+                    {isAgent ? "You" : personaName}
+                  </p>
+                  <div
+                    className={cn(
+                      "rounded-2xl px-3.5 py-2 text-sm leading-relaxed",
+                      isAgent
+                        ? "rounded-br-sm bg-primary text-primary-foreground"
+                        : "rounded-bl-sm border border-border bg-card text-foreground"
+                    )}
+                  >
+                    {item.text}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+          {/* Typing indicator while the debtor is forming a reply */}
+          {status === "processing" && transcript.length > 0 && (
+            <div className="flex justify-start">
+              <div className="max-w-[85%]">
+                <p className="mb-1 text-[11px] font-medium text-muted-foreground">
+                  {personaName}
+                </p>
+                <div className="flex items-center gap-1 rounded-2xl rounded-bl-sm border border-border bg-card px-3.5 py-3">
+                  <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground/60 [animation-delay:-0.3s]" />
+                  <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground/60 [animation-delay:-0.15s]" />
+                  <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground/60" />
+                </div>
+              </div>
+            </div>
+          )}
+          <div ref={transcriptEndRef} />
+        </div>
+
+        {/* Inline error */}
+        {error && (
+          <p
+            role="alert"
+            className="flex items-center justify-center gap-1.5 border-t border-border bg-destructive/5 px-4 py-2 text-xs text-destructive"
+          >
+            <AlertCircle className="h-3.5 w-3.5" aria-hidden="true" />
+            {error}
+          </p>
+        )}
+
+        {/* Phone controls */}
+        <div className="border-t border-border bg-card px-5 py-4">
+          {!isEnded ? (
+            <>
+              {/* Live status line — always tells the user exactly what to do */}
+              <p className="mb-3 flex items-center justify-center gap-1.5 text-center text-sm font-medium text-foreground">
+                {status === "listening" ? (
+                  <>
+                    <Mic className="h-4 w-4 text-primary" aria-hidden="true" />
+                    Listening — speak naturally
+                  </>
+                ) : status === "processing" ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" aria-hidden="true" />
+                    Thinking…
+                  </>
+                ) : status === "speaking" ? (
+                  <span className="text-muted-foreground">{personaName} is speaking…</span>
+                ) : continuousMode ? (
+                  <span className="text-muted-foreground">Your turn — just speak</span>
+                ) : (
+                  <span className="text-muted-foreground">Tap the mic to speak</span>
+                )}
+              </p>
+
+              <div className="flex items-end justify-center gap-10">
+                {/* Mic / talk button */}
+                <div className="flex flex-col items-center gap-1.5">
+                  <button
+                    onClick={startListening}
+                    disabled={status !== "active"}
+                    aria-pressed={status === "listening"}
+                    aria-label={status === "listening" ? "Listening" : "Tap to speak"}
+                    className={cn(
+                      "relative flex h-16 w-16 items-center justify-center rounded-full transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40",
+                      status === "listening"
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-secondary text-secondary-foreground hover:bg-primary/15 active:scale-95"
+                    )}
+                  >
+                    {/* Listening pulse ring */}
+                    {status === "listening" && (
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary/40 motion-reduce:hidden" />
+                    )}
+                    {status === "processing" ? (
+                      <Loader2 className="h-6 w-6 animate-spin" aria-hidden="true" />
+                    ) : (
+                      <Mic className="relative h-6 w-6" aria-hidden="true" />
+                    )}
+                  </button>
+                  <span className="text-[11px] font-medium text-muted-foreground">
+                    {status === "listening" ? "Listening" : "Speak"}
+                  </span>
+                </div>
+
+                {/* End call button */}
+                <div className="flex flex-col items-center gap-1.5">
+                  <button
+                    onClick={() => setConfirmOpen(true)}
+                    aria-label="End call"
+                    className="flex h-16 w-16 items-center justify-center rounded-full bg-destructive text-white shadow-lg shadow-destructive/30 transition-transform hover:opacity-90 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive focus-visible:ring-offset-2"
+                  >
+                    <PhoneOff className="h-6 w-6" aria-hidden="true" />
+                  </button>
+                  <span className="text-[11px] font-medium text-muted-foreground">End</span>
+                </div>
+              </div>
+
+              {/* Continuous listening toggle */}
               <div className="mt-4 flex items-center justify-center gap-2">
                 <label className="text-xs text-muted-foreground cursor-pointer flex items-center gap-2">
                   <input
@@ -580,9 +657,86 @@ function CallPageContent() {
                   Continuous listening
                 </label>
               </div>
-            )}
-          </div>
+            </>
+          ) : (
+            <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+              Call ended. Generating your evaluation…
+            </div>
+          )}
         </div>
+
+        {/* Scenario reference — slides over the call on smaller screens (toggle) */}
+        {scenario && (
+          <div
+            className={cn(
+              "absolute inset-0 z-10 flex flex-col bg-card/95 backdrop-blur-sm transition-all duration-300 lg:hidden",
+              infoOpen
+                ? "pointer-events-auto opacity-100"
+                : "pointer-events-none translate-y-2 opacity-0"
+            )}
+          >
+            <div className="flex items-center justify-between border-b border-border px-5 py-4">
+              <div className="flex items-center gap-2">
+                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10">
+                  <Target className="h-4 w-4 text-primary" aria-hidden="true" />
+                </div>
+                <div>
+                  <h2 className="text-sm font-semibold leading-tight text-foreground">Your call brief</h2>
+                  <p className="text-[11px] leading-tight text-muted-foreground">{scenario.name}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setInfoOpen(false)}
+                aria-label="Close scenario details"
+                className="flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                <X className="h-4 w-4" aria-hidden="true" />
+              </button>
+            </div>
+            <div className="flex-1 space-y-4 overflow-y-auto px-5 py-4">
+              {/* Primary focus — the goal */}
+              <div className="rounded-xl border border-primary/20 bg-primary/5 p-3.5">
+                <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-primary">
+                  <Target className="h-3.5 w-3.5" aria-hidden="true" />
+                  Your goal
+                </p>
+                <p className="mt-1.5 text-sm font-medium leading-relaxed text-foreground">
+                  {scenario.debtor_profile.conversation_goal}
+                </p>
+              </div>
+
+              {/* Hard numbers */}
+              <div className="grid grid-cols-2 gap-2.5">
+                <div className="rounded-xl border border-border bg-muted/40 p-3">
+                  <CircleDollarSign className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                  <p className="mt-1.5 text-base font-semibold leading-none text-foreground">
+                    {formatPHP(scenario.debtor_profile.outstanding_balance)}
+                  </p>
+                  <p className="mt-1 text-[11px] text-muted-foreground">Outstanding</p>
+                </div>
+                <div className="rounded-xl border border-border bg-muted/40 p-3">
+                  <CalendarClock className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                  <p className="mt-1.5 text-base font-semibold leading-none text-foreground">
+                    {scenario.debtor_profile.days_past_due} days
+                  </p>
+                  <p className="mt-1 text-[11px] text-muted-foreground">Past due</p>
+                </div>
+              </div>
+
+              {/* Who you're talking to */}
+              <div className="rounded-xl border border-border bg-muted/40 p-3.5">
+                <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  <User className="h-3.5 w-3.5" aria-hidden="true" />
+                  Who you&apos;re talking to
+                </p>
+                <p className="mt-1.5 text-sm leading-relaxed text-foreground">
+                  {scenario.debtor_profile.personality_profile}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* End-call confirmation */}
@@ -622,8 +776,11 @@ function CallPageContent() {
 
 function CallPageFallback() {
   return (
-    <div className="mx-auto w-full max-w-sm">
-      <div className="h-[calc(100vh-3.5rem-3rem)] animate-pulse rounded-[2rem] border border-border bg-muted" />
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: "radial-gradient(ellipse at center, #1e1530 0%, #0d0a17 100%)" }}
+    >
+      <div className="h-[calc(100vh-2rem)] max-h-[760px] w-full max-w-sm animate-pulse rounded-[2rem] border border-border bg-card shadow-2xl shadow-black/40" />
     </div>
   );
 }

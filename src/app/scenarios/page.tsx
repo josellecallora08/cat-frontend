@@ -283,35 +283,51 @@ export default function ScenariosPage() {
                 <Link
                   href={`/scenarios/${scenario.id}`}
                   aria-label={`Start training: ${scenario.name}`}
-                  className="block rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  className="block cursor-pointer rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                 >
-                  <article className="flex h-full flex-col rounded-2xl border border-border/60 bg-card p-6 transition-all duration-150 group-hover:border-[#8F6AE0]/30 group-hover:shadow-md">
-                    {/* Tags */}
+                  <article className={cn(
+                    "flex h-full flex-col rounded-2xl border bg-card p-6",
+                    "border-border/60",
+                    "transition-all duration-200 ease-out",
+                    "group-hover:-translate-y-1",
+                    "group-hover:border-[#8F6AE0]/40",
+                    "group-hover:shadow-xl group-hover:shadow-[#8F6AE0]/10",
+                  )}>
+                    {/* Type badge */}
                     <div className="flex flex-wrap gap-2">
-                      <span className="inline-flex items-center rounded-full bg-[#8F6AE0]/10 px-3 py-1 text-xs font-semibold text-[#8F6AE0]">
+                      <span className="inline-flex items-center rounded-full bg-[#8F6AE0]/10 px-3 py-1 text-xs font-semibold text-[#8F6AE0] transition-colors duration-200 group-hover:bg-[#8F6AE0]/20">
                         {meta.label}
                       </span>
                     </div>
 
                     {/* Title */}
-                    <h2 className="mt-3 text-base font-bold leading-snug text-[#2B2339]">
+                    <h2 className="mt-3 text-base font-bold leading-snug text-[#2B2339] transition-colors duration-200 group-hover:text-primary">
                       {scenario.name}
                     </h2>
 
-                    {/* Description — 1 line, truncate with ellipsis */}
-                    <p className="mt-2 truncate text-sm text-muted-foreground">
-                      {scenario.description ? scenario.description : `Practice handling a ${meta.label.toLowerCase()} scenario with an AI debtor`}
+                    {/* Description */}
+                    <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">
+                      {scenario.description
+                        ? scenario.description
+                        : `Practice handling a ${meta.label.toLowerCase()} scenario with an AI debtor`}
                     </p>
 
-                    {/* Start practice button */}
+                    {/* CTA button — fills on hover */}
                     <div className="mt-auto pt-5">
-                      <span className="flex h-11 w-full items-center justify-center rounded-full border border-border bg-transparent text-sm font-semibold text-muted-foreground transition-all group-hover:border-[#8F6AE0] group-hover:bg-[#8F6AE0] group-hover:text-white group-hover:shadow-lg group-hover:shadow-[#8F6AE0]/20">
+                      <span className={cn(
+                        "flex h-10 w-full items-center justify-center gap-2 rounded-full border text-sm font-semibold",
+                        "border-border text-muted-foreground",
+                        "transition-all duration-200",
+                        "group-hover:border-[#8F6AE0] group-hover:bg-[#8F6AE0] group-hover:text-white group-hover:shadow-md group-hover:shadow-[#8F6AE0]/25",
+                      )}>
                         Start practice
+                        <ArrowRight className="h-3.5 w-3.5 transition-transform duration-200 group-hover:translate-x-0.5" aria-hidden="true" />
                       </span>
                     </div>
                   </article>
                 </Link>
-                {/* Admin delete button */}
+
+                {/* Admin delete — appears on hover */}
                 {isAdmin && (
                   <button
                     onClick={(e) => {
@@ -320,7 +336,7 @@ export default function ScenariosPage() {
                       setDeleteTarget({ id: scenario.id, name: scenario.name });
                     }}
                     aria-label={`Delete ${scenario.name}`}
-                    className="absolute top-3 right-3 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-card/80 text-muted-foreground opacity-0 backdrop-blur-sm transition-all hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    className="absolute top-3 right-3 z-10 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-card/80 text-muted-foreground opacity-0 backdrop-blur-sm transition-all duration-200 hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                   >
                     <Trash2 className="h-4 w-4" aria-hidden="true" />
                   </button>

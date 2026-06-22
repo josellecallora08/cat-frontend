@@ -3,7 +3,9 @@
 import { usePathname } from "next/navigation";
 import { NavigationShell } from "@/components/navigation-shell";
 
-const SHELL_EXCLUDED_PATHS = ["/login"];
+// Routes that render full-screen without the nav shell / footer.
+// The active call is an immersive, real-call-like experience.
+const SHELL_EXCLUDED_PATHS = ["/login", "/sessions/call", "/sessions/new"];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
