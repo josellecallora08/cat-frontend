@@ -1,7 +1,8 @@
 "use client";
 
-import { use } from "react";
+import { use, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useScenario } from "@/hooks/use-scenarios";
 import { ScenarioIncompleteProfileError } from "@/lib/api/scenarios";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -16,6 +17,8 @@ import {
   ChevronRight,
   AlertCircle,
   Phone,
+  Loader2,
+  ShieldCheck,
   type LucideIcon,
 } from "lucide-react";
 
@@ -97,7 +100,9 @@ export default function ScenarioDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
+  const router = useRouter();
   const { data: scenario, isLoading, isError, error } = useScenario(id);
+  const [starting, setStarting] = useState(false);
 
   if (isLoading) return <ScenarioDetailSkeleton />;
 
@@ -232,20 +237,40 @@ export default function ScenarioDetailPage({
               </div>
 
               <div className="border-t border-border pt-5">
-                <Link
-                  href={`/sessions/new?scenario_id=${scenario.id}`}
-                  className="block"
+                <Button
+                  size="lg"
+                  className="w-full"
+                  disabled={starting}
+                  onClick={() => {
+                    setStarting(true);
+                    router.push(
+                      `/sessions/new?scenario_id=${scenario.id}&debtor_name=${encodeURIComponent(debtor_profile.name)}`
+                    );
+                  }}
                 >
-                  <Button size="lg" className="w-full">
-                    <Phone className="h-4 w-4" aria-hidden="true" />
-                    Start call
-                  </Button>
-                </Link>
+                  {starting ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                      Starting call…
+                    </>
+                  ) : (
+                    <>
+                      <Phone className="h-4 w-4" aria-hidden="true" />
+                      Start call
+                    </>
+                  )}
+                </Button>
                 <Link href="/" className="mt-2 block">
-                  <Button variant="outline" size="lg" className="w-full">
+                  <Button variant="outline" size="lg" className="w-full" disabled={starting}>
                     Back to scenarios
                   </Button>
                 </Link>
+
+                {/* Training simulator note */}
+                <div className="mt-4 flex items-start gap-2 text-xs text-muted-foreground">
+                  <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                  <span>This is a training simulator. No real calls will be made.</span>
+                </div>
               </div>
             </CardContent>
           </Card>
