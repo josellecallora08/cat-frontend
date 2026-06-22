@@ -80,7 +80,8 @@ export function LoginForm({
           onChange={onFieldChange}
         />
 
-        <div className="flex justify-end">
+        {/* Forgot password — hidden until SMTP is configured */}
+        {/* <div className="flex justify-end">
           <button
             type="button"
             onClick={onForgotPassword}
@@ -88,7 +89,7 @@ export function LoginForm({
           >
             Forgot password?
           </button>
-        </div>
+        </div> */}
 
         <PrimaryAuthButton
           status={status}
