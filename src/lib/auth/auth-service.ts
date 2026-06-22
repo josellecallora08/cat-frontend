@@ -48,12 +48,12 @@ export const authService = {
     }
   },
 
-  async signup(email: string, password: string): Promise<AuthResult> {
+  async signup(email: string, password: string, fullName: string): Promise<AuthResult> {
     try {
       const res = await fetch(`${API_BASE_URL}/api/auth/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password, full_name: email.split("@")[0], role: "agent" }),
+        body: JSON.stringify({ email, password, full_name: fullName, role: "agent" }),
       });
 
       if (!res.ok) {
