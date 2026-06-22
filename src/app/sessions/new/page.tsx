@@ -6,7 +6,8 @@ import { useSessionStore } from "@/stores/session-store";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { Loader2, AlertCircle, Check } from "lucide-react";
+import { AlertCircle, Check } from "lucide-react";
+import { CatMascotSvg } from "@/components/auth/CatMascotSvg";
 
 function CenteredCard({ children }: { children: React.ReactNode }) {
   return (
@@ -14,6 +15,22 @@ function CenteredCard({ children }: { children: React.ReactNode }) {
       <Card className="w-full max-w-md">
         <CardContent className="px-6 py-8 text-center">{children}</CardContent>
       </Card>
+    </div>
+  );
+}
+
+function CatLoader({ text, subtext }: { text: string; subtext: string }) {
+  return (
+    <div className="flex min-h-[60vh] items-center justify-center">
+      <div className="flex flex-col items-center gap-4">
+        <div className="w-20 h-20 animate-pulse">
+          <CatMascotSvg className="w-full h-full" id="session-loader" />
+        </div>
+        <div className="text-center">
+          <h1 className="text-lg font-semibold text-foreground">{text}</h1>
+          <p className="mt-1 text-sm text-muted-foreground">{subtext}</p>
+        </div>
+      </div>
     </div>
   );
 }
@@ -67,13 +84,10 @@ export default function NewSessionPage() {
   return (
     <Suspense
       fallback={
-        <CenteredCard>
-          <Loader2
-            className="mx-auto h-8 w-8 animate-spin text-primary"
-            aria-hidden="true"
-          />
-          <p className="mt-4 text-lg font-medium text-foreground">Loading…</p>
-        </CenteredCard>
+        <CatLoader
+          text="Getting ready"
+          subtext="Loading session details..."
+        />
       }
     >
       <NewSessionContent />
@@ -189,22 +203,16 @@ function NewSessionContent() {
   // Preparing state (creating / connecting)
   const isCreating = status === "creating" || status === "idle";
   return (
-    <CenteredCard>
-      <div role="status" aria-live="polite" className="flex flex-col items-center">
-        <Loader2
-          className="h-8 w-8 animate-spin text-primary"
-          aria-hidden="true"
-        />
-        <h1 className="mt-4 text-lg font-medium text-foreground">
-          {isCreating ? "Preparing your session" : "Connecting"}
-        </h1>
-        <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-          {isCreating
-            ? "Setting things up and generating a realistic debtor persona."
-            : "Establishing a secure connection to the voice channel."}
-        </p>
+    <div>
+      <CatLoader
+        text={isCreating ? "Preparing your session" : "Connecting to voice channel"}
+        subtext={isCreating
+          ? "Creating a realistic debtor persona for your training..."
+          : "Almost there! Establishing a secure voice connection."}
+      />
+      <div className="flex justify-center">
+        <StepIndicator step={isCreating ? "creating" : "connecting"} />
       </div>
-      <StepIndicator step={isCreating ? "creating" : "connecting"} />
-    </CenteredCard>
+    </div>
   );
 }

@@ -280,22 +280,36 @@ function CallPageContent() {
   }, [sendMessage, continuousMode]);
 
   // Auto-restart listening after debtor finishes speaking (continuous mode only)
+  // Add a short delay to avoid picking up tail-end of TTS audio
   useEffect(() => {
     if (status === "active" && recognitionRef.current && continuousMode) {
-      try {
-        recognitionRef.current.start();
-        setStatus("listening");
-      } catch { /* already running */ }
+      const timer = setTimeout(() => {
+        try {
+          recognitionRef.current?.start();
+          setStatus("listening");
+        } catch { /* already running */ }
+      }, 600); // 600ms delay after TTS to avoid echo pickup
+      return () => clearTimeout(timer);
     }
   }, [status, continuousMode]);
 
-  // Auto-start listening when call begins
+  // Stop recognition while debtor is speaking (prevent mic picking up TTS)
+  useEffect(() => {
+    if (status === "speaking" || status === "processing") {
+      try {
+        recognitionRef.current?.stop();
+      } catch { /* not running */ }
+    }
+  }, [status]);
+
+  // Auto-start listening when call begins (first time only)
   const hasStartedListening = useRef(false);
   useEffect(() => {
     if (status === "active" && !hasStartedListening.current) {
       hasStartedListening.current = true;
       if (continuousMode) {
-        startListening();
+        // Delay first listen to avoid picking up initial TTS
+        setTimeout(() => startListening(), 600);
       }
     }
   }, [status, startListening, continuousMode]);
