@@ -5,7 +5,7 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: ui-rounded, "SF Pro Rounded", "SF Compact Rounded", -apple-system, "Arial Rounded MT Bold", system-ui, sans-serif;
+  --font-sans: var(--font-nunito), "Nunito", ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono);
   --font-heading: var(--font-sans);
   --color-sidebar-ring: var(--sidebar-ring);
@@ -116,5 +116,24 @@
   }
   html {
     @apply font-sans;
+  }
+  /* Ensure pointer cursor on all interactive elements globally */
+  button,
+  [role="button"],
+  [role="tab"],
+  [role="menuitem"],
+  [role="option"],
+  [role="radio"],
+  [role="checkbox"],
+  select,
+  label[for],
+  a[href],
+  input[type="checkbox"],
+  input[type="radio"],
+  input[type="submit"],
+  input[type="button"],
+  input[type="file"],
+  input[type="range"] {
+    cursor: pointer;
   }
 }

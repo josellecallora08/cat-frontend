@@ -121,13 +121,13 @@ function StatCard({
 }) {
   return (
     <Card>
-      <CardContent className="flex items-start gap-4 pt-6">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-secondary">
-          <Icon className="h-5 w-5 text-secondary-foreground" aria-hidden="true" />
+      <CardContent className="flex items-start gap-3">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-secondary">
+          <Icon className="h-4 w-4 text-secondary-foreground" aria-hidden="true" />
         </div>
         <div>
           <p className="text-xs font-medium text-muted-foreground">{title}</p>
-          <p className="mt-0.5 text-2xl font-semibold leading-tight text-foreground">{value}</p>
+          <p className="mt-0.5 text-xl font-semibold leading-tight text-foreground">{value}</p>
           {subtitle && <p className="mt-0.5 text-xs text-muted-foreground">{subtitle}</p>}
         </div>
       </CardContent>
@@ -238,7 +238,7 @@ export default function DashboardPage() {
   }));
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* Header */}
       <header className="flex items-center justify-between">
         <div className="space-y-1">
@@ -260,7 +260,7 @@ export default function DashboardPage() {
       </header>
 
       {/* KPI Cards */}
-      <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
           title="Total Sessions"
           value={data.total_sessions}
@@ -292,7 +292,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Charts Row */}
-      <div className="grid gap-6 grid-cols-1 lg:grid-cols-2">
+      <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
         {/* Score Progression Chart */}
         <Card>
           <CardHeader>
