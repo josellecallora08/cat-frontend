@@ -105,7 +105,7 @@ export function AuthShell() {
 
   // Signup handler
   const handleSignup = useCallback(
-    async (email: string, password: string) => {
+    async (email: string, password: string, fullName: string) => {
       const validation = validateSignup(email, password);
       if (!validation.valid) {
         setStatus("error");
@@ -114,8 +114,15 @@ export function AuthShell() {
         return;
       }
 
+      if (!fullName) {
+        setStatus("error");
+        setFieldErrors({ firstName: " " });
+        setButtonMessage("Please enter your name");
+        return;
+      }
+
       setStatus("submitting");
-      const result = await authService.signup(email, password);
+      const result = await authService.signup(email, password, fullName);
 
       if (!result.success) {
         setStatus("error");
@@ -261,7 +268,7 @@ export function AuthShell() {
           </div>
           )}
           {step === "form" && (
-          <p className="m-0 mb-[clamp(14px,2svh,20px)] md:mb-4 text-[10px] md:text-[12px] font-medium opacity-90 text-[#2B2339]">
+          <p className="m-0 mb-[clamp(20px,3svh,32px)] md:mb-6 text-[10px] md:text-[12px] font-medium opacity-90 text-[#2B2339]">
             AI-powered Collection Agent Training System
           </p>
           )}
@@ -315,12 +322,14 @@ export function AuthShell() {
                 status={status}
                 fieldErrors={fieldErrors}
                 buttonMessage={buttonMessage}
+                role={selectedRole}
                 onSubmit={handleLogin}
                 onForgotPassword={() => switchView("reset")}
                 onSignup={() => switchView("signup")}
                 onGoogle={handleGoogle}
                 onLark={handleLark}
                 onFieldChange={handleFieldChange}
+                onBackToRoles={() => { setStep("roleSelect"); switchView("login"); }}
               />
             )}
 
@@ -347,14 +356,6 @@ export function AuthShell() {
               />
             )}
 
-            {/* Back to role selection */}
-            <button
-              type="button"
-              onClick={() => { setStep("roleSelect"); switchView("login"); }}
-              className="mt-1 border-0 p-0 bg-transparent text-[11px] md:text-[13px] font-semibold text-[#2B2339]/[0.44] cursor-pointer hover:text-[#2B2339] transition-colors"
-            >
-              ← Choose a different role
-            </button>
           </div>
           )}
         </div>

@@ -12,24 +12,28 @@ interface LoginFormProps {
   status: AuthStatus;
   fieldErrors: AuthFieldErrors;
   buttonMessage: string;
+  role?: "agent" | "admin";
   onSubmit: (email: string, password: string) => void;
   onForgotPassword: () => void;
   onSignup: () => void;
   onGoogle: () => void;
   onLark: () => void;
   onFieldChange: () => void;
+  onBackToRoles?: () => void;
 }
 
 export function LoginForm({
   status,
   fieldErrors,
   buttonMessage,
+  role,
   onSubmit,
   onForgotPassword,
   onSignup,
   onGoogle,
   onLark,
   onFieldChange,
+  onBackToRoles,
 }: LoginFormProps) {
   const emailRef = useRef<HTMLInputElement>(null);
   const passwordRef = useRef<HTMLInputElement>(null);
@@ -52,6 +56,22 @@ export function LoginForm({
         noValidate
         className="w-full grid gap-2 md:gap-[14px]"
       >
+        {role && (
+          <button
+            type="button"
+            onClick={onBackToRoles}
+            className="flex items-center gap-1.5 px-0 py-2 border-0 bg-transparent cursor-pointer hover:opacity-70 transition-opacity"
+          >
+            <span className="text-[11px] md:text-xs font-semibold text-[#2B2339]/50">←</span>
+            <span className="text-[11px] md:text-xs font-medium text-[#2B2339]/70">
+              Signing in as{" "}
+              <span className="font-bold text-[#8F6AE0]">
+                {role === "admin" ? "Administrator" : "Agent"}
+              </span>
+            </span>
+          </button>
+        )}
+
         <AuthInput
           ref={emailRef}
           id="login-email"
