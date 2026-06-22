@@ -17,6 +17,8 @@ export type AuthErrorCode =
 export interface AuthFieldErrors {
   email?: string;
   password?: string;
+  firstName?: string;
+  lastName?: string;
 }
 
 export interface AuthState {
