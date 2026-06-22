@@ -5,7 +5,9 @@ import { usePathname, useRouter } from "next/navigation";
 import { LayoutGrid, Mic, Users, TrendingUp, Settings, LogOut, User } from "lucide-react";
 import gsap from "gsap";
 import { useAuthStore } from "@/stores/auth-store";
+import { useScroll } from "@/hooks/use-scroll";
 import { cn } from "@/lib/utils";
+import GradualBlur from "@/components/react-bits/GradualBlur";
 
 const agentNavItems = [
   { href: "/", label: "Dashboard", icon: TrendingUp },
@@ -29,6 +31,9 @@ export function NavigationShell({ children }: { children: React.ReactNode }) {
   const navRef = useRef<HTMLElement>(null);
   const pillRef = useRef<HTMLSpanElement>(null);
   const itemRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+
+  // Scroll-aware: header floats into a compact pill when the page is scrolled.
+  const scrolled = useScroll(12);
 
   const prefersReduced =
     typeof window !== "undefined" &&
@@ -80,6 +85,12 @@ export function NavigationShell({ children }: { children: React.ReactNode }) {
     movePill(true);
   }, [pathname, movePill]);
 
+  // Recalculate pill position when the header reflows on scroll-shrink.
+  useEffect(() => {
+    const id = setTimeout(() => movePill(true), 260);
+    return () => clearTimeout(id);
+  }, [scrolled, movePill]);
+
   useEffect(() => {
     const onResize = () => movePill(false);
     window.addEventListener("resize", onResize);
@@ -123,9 +134,36 @@ export function NavigationShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
-      {/* Top bar — full width, glassmorphism */}
-      <header className="sticky top-0 z-50 w-full bg-white/50 backdrop-blur-2xl border-b border-black/5">
-        <div className="mx-auto flex h-[62px] max-w-7xl items-center justify-between px-6 lg:px-8">
+      {/* Gradual blur overlay — blurs page content as it scrolls behind the nav */}
+      <GradualBlur
+        target="page"
+        position="top"
+        height="6rem"
+        strength={2}
+        divCount={5}
+        curve="bezier"
+        exponential
+        opacity={1}
+        zIndex={40}
+      />
+
+      {/* Top bar — transparent at top; floats into a compact pill when scrolled.
+          Content underneath is softened by the GradualBlur overlay. */}
+      <div className="sticky top-0 z-[200] w-full px-4 pt-0 md:pt-2">
+        <header
+          className={cn(
+            "mx-auto w-full max-w-7xl transition-all duration-300 ease-out",
+            scrolled
+              ? "max-w-4xl rounded-2xl border border-white/60 bg-white/40 shadow-lg shadow-black/5 backdrop-blur-2xl md:mt-1"
+              : "border border-transparent bg-transparent"
+          )}
+        >
+          <div
+            className={cn(
+              "mx-auto flex items-center justify-between transition-all duration-300 ease-out",
+              scrolled ? "h-[54px] px-4 lg:px-5" : "h-[62px] px-6 lg:px-8"
+            )}
+          >
           {/* Logo — just the purple cat mascot */}
           <div className="h-9 w-9 shrink-0">
             <svg viewBox="0 0 45 41" fill="none" xmlns="http://www.w3.org/2000/svg" className="h-full w-auto" aria-label="CATS">
@@ -200,7 +238,7 @@ export function NavigationShell({ children }: { children: React.ReactNode }) {
 
               {/* Profile dropdown */}
               {profileOpen && (
-                <div className="absolute right-0 top-full mt-2 w-56 rounded-xl bg-white shadow-lg shadow-black/10 border border-[#F3F3F3] py-2 z-50">
+                <div className="absolute right-0 top-full mt-2 w-56 rounded-xl bg-white shadow-lg shadow-black/10 border border-[#F3F3F3] py-2 z-[210]">
                   {/* User info */}
                   <div className="px-4 py-3 border-b border-[#F3F3F3]">
                     <p className="text-sm font-semibold text-[#2B2339] truncate">{user?.full_name ?? "User"}</p>
@@ -240,12 +278,13 @@ export function NavigationShell({ children }: { children: React.ReactNode }) {
               )}
             </div>
           </div>
-        </div>
-      </header>
+          </div>
+        </header>
+      </div>
 
       {/* Main content */}
       <main className="flex-1">
-        <div ref={contentRef} className="mx-auto max-w-7xl px-6 py-8 lg:px-8">
+        <div ref={contentRef} className="mx-auto max-w-7xl px-6 py-6 lg:px-8">
           {children}
         </div>
       </main>
