@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import Link from "next/link";
+import { useSearchParams, useRouter } from "next/navigation";
 import { useScenarios } from "@/hooks/use-scenarios";
 import { useAuthStore } from "@/stores/auth-store";
 import { useQueryClient, useMutation } from "@tanstack/react-query";
@@ -98,8 +99,31 @@ export default function ScenariosPage() {
   const token = useAuthStore((s) => s.token) ?? "";
   const isAdmin = user?.role === "admin";
   const queryClient = useQueryClient();
+  const searchParams = useSearchParams();
+  const router = useRouter();
 
-  const [activeFilter, setActiveFilter] = useState("ALL");
+  // Read filter from URL, default to "ALL"
+  const filterParam = searchParams.get("filter") ?? "ALL";
+  const [activeFilter, setActiveFilterState] = useState(filterParam);
+
+  // Sync URL param to state on mount/change
+  useEffect(() => {
+    setActiveFilterState(filterParam);
+  }, [filterParam]);
+
+  // Update URL when filter changes
+  const setActiveFilter = (value: string) => {
+    setActiveFilterState(value);
+    const params = new URLSearchParams(searchParams.toString());
+    if (value === "ALL") {
+      params.delete("filter");
+    } else {
+      params.set("filter", value);
+    }
+    const qs = params.toString();
+    router.replace(`/scenarios${qs ? `?${qs}` : ""}`, { scroll: false });
+  };
+
   const [showGenerate, setShowGenerate] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
 
@@ -278,10 +302,13 @@ export default function ScenariosPage() {
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {visible.map((scenario) => {
             const meta = typeMeta[scenario.scenario_type] ?? fallbackMeta;
+            const detailHref = activeFilter === "ALL"
+              ? `/scenarios/${scenario.id}`
+              : `/scenarios/${scenario.id}?filter=${encodeURIComponent(activeFilter)}`;
             return (
               <div key={scenario.id} className="relative group">
                 <Link
-                  href={`/scenarios/${scenario.id}`}
+                  href={detailHref}
                   aria-label={`Start training: ${scenario.name}`}
                   className="block cursor-pointer rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                 >

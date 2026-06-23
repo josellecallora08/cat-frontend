@@ -103,16 +103,24 @@ function StepNav({
 }) {
   return (
     <div className="flex items-center justify-between">
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={onPrev}
-        disabled={currentStep === 0}
-        className="gap-1.5"
-      >
-        <ArrowLeft className="h-4 w-4" />
-        Back
-      </Button>
+      {currentStep === 0 ? (
+        <Link href="/sessions">
+          <Button variant="outline" size="sm" className="gap-1.5">
+            <ArrowLeft className="h-4 w-4" />
+            All Sessions
+          </Button>
+        </Link>
+      ) : (
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onPrev}
+          className="gap-1.5"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back
+        </Button>
+      )}
       <div className="flex items-center gap-1.5">
         {Array.from({ length: totalSteps }).map((_, i) => (
           <button
@@ -506,8 +514,8 @@ function SummaryStep({ sessionId, data, coaching, learningPlan }: { sessionId: s
 
         {/* Actions — 2 col */}
         <div className="col-span-2 grid grid-cols-2 gap-3 pt-1">
-          <Link href="/results" className="block">
-            <Button variant="outline" className="w-full" size="lg">All results</Button>
+          <Link href="/sessions" className="block">
+            <Button variant="outline" className="w-full" size="lg">All Sessions</Button>
           </Link>
           <Link href="/scenarios" className="block">
             <Button className="w-full" size="lg">Train another scenario</Button>

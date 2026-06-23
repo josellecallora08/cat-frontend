@@ -2,7 +2,7 @@
 
 import { use, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useScenario } from "@/hooks/use-scenarios";
 import { ScenarioIncompleteProfileError } from "@/lib/api/scenarios";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -38,13 +38,13 @@ function formatCurrency(amount: number): string {
   }).format(amount);
 }
 
-function Breadcrumb({ name }: { name?: string }) {
+function Breadcrumb({ name, backHref }: { name?: string; backHref: string }) {
   return (
     <nav aria-label="Breadcrumb" className="mb-6">
       <ol className="flex items-center gap-1.5 text-sm text-muted-foreground">
         <li>
           <Link
-            href="/"
+            href={backHref}
             className="rounded transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           >
             Scenarios
@@ -101,8 +101,13 @@ export default function ScenarioDetailPage({
 }) {
   const { id } = use(params);
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { data: scenario, isLoading, isError, error } = useScenario(id);
   const [starting, setStarting] = useState(false);
+
+  // Build back URL preserving the filter param
+  const filter = searchParams.get("filter");
+  const backHref = filter ? `/scenarios?filter=${encodeURIComponent(filter)}` : "/scenarios";
 
   if (isLoading) return <ScenarioDetailSkeleton />;
 
@@ -110,7 +115,7 @@ export default function ScenarioDetailPage({
     const isIncompleteProfile = error instanceof ScenarioIncompleteProfileError;
     return (
       <div>
-        <Breadcrumb name="Error" />
+        <Breadcrumb name="Error" backHref={backHref} />
         <div
           role="alert"
           className="flex flex-col items-center rounded-lg border border-border bg-card px-6 py-12 text-center"
@@ -128,7 +133,7 @@ export default function ScenarioDetailPage({
               ? error.message
               : "An unexpected error occurred."}
           </p>
-          <Link href="/">
+          <Link href={backHref}>
             <Button variant="outline" size="sm" className="mt-4">
               Back to scenarios
             </Button>
@@ -146,7 +151,7 @@ export default function ScenarioDetailPage({
 
   return (
     <div>
-      <Breadcrumb name={scenario.name} />
+      <Breadcrumb name={scenario.name} backHref={backHref} />
 
       <div className="grid grid-cols-12 gap-6">
         {/* Main column */}
@@ -260,7 +265,7 @@ export default function ScenarioDetailPage({
                     </>
                   )}
                 </Button>
-                <Link href="/" className="mt-2 block">
+                <Link href={backHref} className="mt-2 block">
                   <Button variant="outline" size="lg" className="w-full" disabled={starting}>
                     Back to scenarios
                   </Button>
