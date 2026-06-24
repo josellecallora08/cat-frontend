@@ -147,9 +147,11 @@ function EvaluationStep({ data }: { data: EvaluationResult }) {
   return (
     <div className="space-y-5">
       {data.is_too_short && (
-        <div className="rounded-xl border border-[#F59E0B]/30 bg-[#F59E0B]/5 p-4 text-center">
-          <AlertTriangle className="mx-auto h-5 w-5 text-[#F59E0B]" />
-          <p className="mt-1.5 text-xs text-muted-foreground">
+        <div className="flex items-center gap-3 rounded-xl border border-[#F59E0B]/30 bg-[#F59E0B]/5 px-4 py-3">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#F59E0B]">
+            <AlertTriangle className="h-4 w-4 text-white" />
+          </div>
+          <p className="text-xs text-muted-foreground text-left">
             Short session — scores may be less accurate with fewer turns.
           </p>
         </div>
