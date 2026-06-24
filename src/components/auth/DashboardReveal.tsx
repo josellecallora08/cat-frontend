@@ -1,21 +1,26 @@
 "use client";
 
 import { useRef, useEffect } from "react";
+import { usePathname } from "next/navigation";
 import gsap from "gsap";
 
 /**
  * Full-screen purple overlay that performs a circular wipe reveal
- * when the user arrives at the dashboard after login.
- * It checks for a sessionStorage flag set during login flow.
+ * only on hard page load (browser refresh / initial load).
+ * Does NOT trigger on client-side navigation or tab switches.
  */
 export function DashboardReveal() {
   const overlayRef = useRef<HTMLDivElement>(null);
+  const pathname = usePathname();
+  const hasPlayed = useRef(false);
 
   useEffect(() => {
-    const shouldReveal = sessionStorage.getItem("cat_reveal_dashboard");
-    if (!shouldReveal) return;
+    // Don't play on login page
+    if (pathname === "/login") return;
 
-    sessionStorage.removeItem("cat_reveal_dashboard");
+    // Only play once per hard page load
+    if (hasPlayed.current) return;
+    hasPlayed.current = true;
 
     const overlay = overlayRef.current;
     if (!overlay) return;
@@ -24,6 +29,7 @@ export function DashboardReveal() {
       window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 
     // Make overlay visible
+    overlay.style.display = "block";
     overlay.style.visibility = "visible";
     overlay.style.opacity = "1";
 
@@ -38,7 +44,7 @@ export function DashboardReveal() {
       return;
     }
 
-    // Circular wipe shrink from center to reveal dashboard
+    // Circular wipe shrink from center to reveal page
     const cx = window.innerWidth / 2;
     const cy = window.innerHeight * 0.35;
     const maxRadius = Math.hypot(
@@ -53,12 +59,12 @@ export function DashboardReveal() {
       clipPath: `circle(0px at ${cx}px ${cy}px)`,
       duration: 0.72,
       ease: "power3.inOut",
-      delay: 0.1,
+      delay: 0.15,
       onComplete: () => {
         overlay.style.display = "none";
       },
     });
-  }, []);
+  }, [pathname]);
 
   return (
     <div
