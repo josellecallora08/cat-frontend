@@ -144,22 +144,16 @@ function StepNav({
 
 // --- Step 1: Evaluation scores ---
 function EvaluationStep({ data }: { data: EvaluationResult }) {
-  if (data.is_too_short) {
-    return (
-      <div className="space-y-4">
-        <div className="rounded-xl border border-[#F59E0B]/30 bg-[#F59E0B]/5 p-5 text-center">
-          <AlertTriangle className="mx-auto h-6 w-6 text-[#F59E0B]" />
-          <p className="mt-2 text-sm font-medium text-foreground">Session too short</p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Complete a longer conversation (4+ turns) for a full evaluation.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-5">
+      {data.is_too_short && (
+        <div className="rounded-xl border border-[#F59E0B]/30 bg-[#F59E0B]/5 p-4 text-center">
+          <AlertTriangle className="mx-auto h-5 w-5 text-[#F59E0B]" />
+          <p className="mt-1.5 text-xs text-muted-foreground">
+            Short session — scores may be less accurate with fewer turns.
+          </p>
+        </div>
+      )}
       <div className="space-y-4">
         {data.category_scores.map((item: CompetencyScore) => (
           <div key={item.category} className="space-y-1.5">
