@@ -1,8 +1,9 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
+import gsap from "gsap";
 import { useScenarios } from "@/hooks/use-scenarios";
 import { useAuthStore } from "@/stores/auth-store";
 import { useQueryClient, useMutation } from "@tanstack/react-query";
@@ -181,6 +182,86 @@ export default function ScenariosPage() {
     return scenarios.filter((s) => s.scenario_type === activeFilter);
   }, [scenarios, activeFilter]);
 
+  // Sliding pill indicator + direction-aware content animation
+  const gridRef = useRef<HTMLDivElement>(null);
+  const tablistRef = useRef<HTMLDivElement>(null);
+  const pillRef = useRef<HTMLSpanElement>(null);
+  const tabRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const prevFilterRef = useRef(activeFilter);
+
+  // Move the sliding pill under the active tab
+  const movePill = (animate: boolean) => {
+    const el = tabRefs.current[activeFilter];
+    const pill = pillRef.current;
+    const list = tablistRef.current;
+    if (!el || !pill || !list) return;
+    const listBox = list.getBoundingClientRect();
+    const box = el.getBoundingClientRect();
+    const prefersReduced =
+      typeof window !== "undefined" &&
+      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    gsap.to(pill, {
+      left: box.left - listBox.left,
+      top: box.top - listBox.top,
+      width: box.width,
+      height: box.height,
+      opacity: 1,
+      duration: animate && !prefersReduced ? 0.4 : 0,
+      ease: "power3.out",
+    });
+  };
+
+  // Position pill on mount and when the filter changes
+  useEffect(() => {
+    movePill(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => {
+    movePill(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeFilter, scenarios]);
+  useEffect(() => {
+    const onResize = () => movePill(false);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Animate cards in the same direction the pill travels
+  useEffect(() => {
+    if (!gridRef.current || visible.length === 0) return;
+    const prefersReduced =
+      typeof window !== "undefined" &&
+      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+
+    // Determine travel direction from the previous filter's position
+    const order = filters.map((f) => f.value);
+    const prevIndex = order.indexOf(prevFilterRef.current);
+    const nextIndex = order.indexOf(activeFilter);
+    prevFilterRef.current = activeFilter;
+    const dir = nextIndex > prevIndex ? 1 : nextIndex < prevIndex ? -1 : 0;
+
+    if (prefersReduced) return;
+
+    const cards = gridRef.current.querySelectorAll("[data-scenario-card]");
+    const ctx = gsap.context(() => {
+      gsap.fromTo(
+        cards,
+        { opacity: 0, x: dir * 36, scale: 0.98 },
+        {
+          opacity: 1,
+          x: 0,
+          scale: 1,
+          duration: 0.42,
+          ease: "power3.out",
+          stagger: 0.045,
+          clearProps: "transform",
+        }
+      );
+    }, gridRef);
+    return () => ctx.revert();
+  }, [activeFilter, visible]);
+
   return (
     <div className="space-y-6">
       {/* Page heading */}
@@ -204,22 +285,33 @@ export default function ScenariosPage() {
       {/* Filter tabs (pill variant) */}
       {!isError && (
         <div
+          ref={tablistRef}
           role="tablist"
           aria-label="Filter scenarios by type"
-          className="flex flex-wrap items-center gap-1.5 border-b border-border pb-4"
+          className="relative flex flex-wrap items-center gap-1.5 border-b border-border pb-4"
         >
+          {/* Sliding active indicator */}
+          <span
+            ref={pillRef}
+            aria-hidden="true"
+            className="pointer-events-none absolute top-0 left-0 h-9 rounded-full bg-primary"
+            style={{ width: 0, opacity: 0 }}
+          />
           {filters.map((f) => {
             const active = activeFilter === f.value;
             return (
               <button
                 key={f.value}
+                ref={(el) => {
+                  tabRefs.current[f.value] = el;
+                }}
                 role="tab"
                 aria-selected={active}
                 onClick={() => setActiveFilter(f.value)}
                 className={cn(
-                  "min-h-9 rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                  "relative z-10 min-h-9 rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
                   active
-                    ? "bg-primary text-primary-foreground"
+                    ? "text-primary-foreground"
                     : "text-muted-foreground hover:bg-muted hover:text-foreground"
                 )}
               >
@@ -299,14 +391,14 @@ export default function ScenariosPage() {
 
       {/* Grid */}
       {!isLoading && !isError && visible.length > 0 && (
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        <div ref={gridRef} className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {visible.map((scenario) => {
             const meta = typeMeta[scenario.scenario_type] ?? fallbackMeta;
             const detailHref = activeFilter === "ALL"
               ? `/scenarios/${scenario.id}`
               : `/scenarios/${scenario.id}?filter=${encodeURIComponent(activeFilter)}`;
             return (
-              <div key={scenario.id} className="relative group">
+              <div key={scenario.id} data-scenario-card className="relative group">
                 <Link
                   href={detailHref}
                   aria-label={`Start training: ${scenario.name}`}
