@@ -1,14 +1,26 @@
 "use client";
 
+import { useRef, useEffect, useState } from "react";
 import Link from "next/link";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, keepPreviousData } from "@tanstack/react-query";
+import gsap from "gsap";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Select } from "@/components/ui/select";
 import { useAuthStore } from "@/stores/auth-store";
-import { Mic, ArrowRight, Loader2 } from "lucide-react";
+import { cn } from "@/lib/utils";
+import {
+  Mic,
+  ArrowRight,
+  Loader2,
+  ChevronLeft,
+  ChevronRight,
+  ArrowUpDown,
+} from "lucide-react";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
+const PAGE_SIZE = 8;
 
 interface SessionItem {
   id: string;
@@ -29,13 +41,45 @@ interface PaginatedSessions {
   total_pages: number;
 }
 
-async function fetchMySessions(agentId?: string): Promise<SessionItem[]> {
-  const params = new URLSearchParams({ page: "1", page_size: "50" });
-  if (agentId) params.set("agent_id", agentId);
-  const res = await fetch(`${API_BASE_URL}/api/dashboard/sessions?${params}`);
-  if (!res.ok) return [];
-  const data: PaginatedSessions = await res.json();
-  return data.items;
+type SortBy = "created_at" | "score" | "scenario" | "status";
+type SortDir = "asc" | "desc";
+
+const sortOptions: { value: `${SortBy}:${SortDir}`; label: string }[] = [
+  { value: "created_at:desc", label: "Newest first" },
+  { value: "created_at:asc", label: "Oldest first" },
+  { value: "score:desc", label: "Highest score" },
+  { value: "score:asc", label: "Lowest score" },
+  { value: "scenario:asc", label: "Scenario A–Z" },
+  { value: "status:asc", label: "Status" },
+];
+
+const statusFilters = [
+  { value: "ALL", label: "All" },
+  { value: "completed", label: "Completed" },
+  { value: "active", label: "Active" },
+  { value: "pending", label: "Pending" },
+  { value: "error", label: "Error" },
+];
+
+async function fetchSessions(params: {
+  page: number;
+  agentId?: string;
+  status: string;
+  sortBy: SortBy;
+  sortDir: SortDir;
+}): Promise<PaginatedSessions> {
+  const qs = new URLSearchParams({
+    page: String(params.page),
+    page_size: String(PAGE_SIZE),
+    sort_by: params.sortBy,
+    sort_dir: params.sortDir,
+  });
+  if (params.agentId) qs.set("agent_id", params.agentId);
+  if (params.status !== "ALL") qs.set("status", params.status);
+
+  const res = await fetch(`${API_BASE_URL}/api/dashboard/sessions?${qs}`);
+  if (!res.ok) throw new Error("Failed to load sessions");
+  return res.json();
 }
 
 function formatDate(dateStr: string): string {
@@ -64,84 +108,272 @@ function StatusBadge({ status }: { status: string }) {
 export default function SessionsPage() {
   const user = useAuthStore((s) => s.user);
   const isAdmin = user?.role === "admin";
-  // Agents see only their own sessions; admins see all
   const agentFilter = !isAdmin && user?.id ? user.id : undefined;
 
-  const { data: sessions, isLoading } = useQuery({
-    queryKey: ["my-sessions", agentFilter],
-    queryFn: () => fetchMySessions(agentFilter),
+  const [page, setPage] = useState(1);
+  const [status, setStatus] = useState("ALL");
+  const [sort, setSort] = useState<`${SortBy}:${SortDir}`>("created_at:desc");
+  const [sortBy, sortDir] = sort.split(":") as [SortBy, SortDir];
+
+  const { data, isLoading, isFetching, isError, refetch } = useQuery({
+    queryKey: ["sessions", agentFilter, page, status, sortBy, sortDir],
+    queryFn: () =>
+      fetchSessions({ page, agentId: agentFilter, status, sortBy, sortDir }),
+    placeholderData: keepPreviousData,
   });
+
+  // Reset to first page whenever filters/sort change
+  useEffect(() => {
+    setPage(1);
+  }, [status, sort]);
+
+  const sessions = data?.items ?? [];
+  const totalPages = data?.total_pages ?? 1;
+  const total = data?.total ?? 0;
+
+  // Smooth list transition on data change
+  const listRef = useRef<HTMLUListElement>(null);
+  useEffect(() => {
+    if (!listRef.current || sessions.length === 0) return;
+    const prefersReduced =
+      typeof window !== "undefined" &&
+      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    if (prefersReduced) return;
+
+    const rows = listRef.current.querySelectorAll("[data-session-row]");
+    const ctx = gsap.context(() => {
+      gsap.fromTo(
+        rows,
+        { opacity: 0, y: 12 },
+        {
+          opacity: 1,
+          y: 0,
+          duration: 0.35,
+          ease: "power3.out",
+          stagger: 0.04,
+          clearProps: "transform",
+        }
+      );
+    }, listRef);
+    return () => ctx.revert();
+  }, [sessions]);
 
   return (
     <div className="space-y-6">
-      <header className="space-y-1">
-        <h1 className="text-2xl font-medium leading-tight text-foreground">
-          Sessions
-        </h1>
-        <p className="text-sm leading-relaxed text-muted-foreground">
-          {isAdmin ? "All training sessions." : "Your training session history."}
-        </p>
+      <header className="flex flex-wrap items-end justify-between gap-4">
+        <div className="space-y-1">
+          <h1 className="text-2xl font-medium leading-tight text-foreground">
+            Sessions
+          </h1>
+          <p className="text-sm leading-relaxed text-muted-foreground">
+            {isAdmin ? "All training sessions." : "Your training session history."}
+          </p>
+        </div>
+
+        {/* Sort dropdown */}
+        <div className="w-48">
+          <Select
+            id="sort"
+            ariaLabel="Sort sessions"
+            value={sort}
+            onChange={(v) => setSort(v as `${SortBy}:${SortDir}`)}
+            options={sortOptions}
+            icon={<ArrowUpDown className="h-4 w-4" aria-hidden="true" />}
+          />
+        </div>
       </header>
 
+      {/* Status filter tabs */}
+      <div
+        role="tablist"
+        aria-label="Filter sessions by status"
+        className="flex flex-wrap items-center gap-1.5 border-b border-border pb-4"
+      >
+        {statusFilters.map((f) => {
+          const active = status === f.value;
+          return (
+            <button
+              key={f.value}
+              role="tab"
+              aria-selected={active}
+              onClick={() => setStatus(f.value)}
+              className={cn(
+                "min-h-9 rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                active
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
+              )}
+            >
+              {f.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Initial load */}
       {isLoading && (
         <div className="flex items-center justify-center py-12">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" aria-hidden="true" />
         </div>
       )}
 
-      {!isLoading && (!sessions || sessions.length === 0) && (
+      {/* Error */}
+      {isError && (
+        <div
+          role="alert"
+          className="flex flex-col items-center rounded-lg border border-border bg-card px-6 py-12 text-center"
+        >
+          <h2 className="text-base font-medium text-foreground">
+            Couldn&apos;t load sessions
+          </h2>
+          <Button variant="outline" size="sm" className="mt-4" onClick={() => refetch()}>
+            Try again
+          </Button>
+        </div>
+      )}
+
+      {/* Empty */}
+      {!isLoading && !isError && sessions.length === 0 && (
         <div className="flex flex-col items-center rounded-lg border border-dashed border-border bg-card px-6 py-12 text-center">
           <div className="flex h-12 w-12 items-center justify-center rounded-full bg-secondary">
             <Mic className="h-6 w-6 text-secondary-foreground" aria-hidden="true" />
           </div>
           <h2 className="mt-4 text-base font-medium text-foreground">
-            No sessions yet
+            {status === "ALL" ? "No sessions yet" : "No sessions in this category"}
           </h2>
           <p className="mt-1 max-w-sm text-sm text-muted-foreground">
-            Pick a scenario to run your first training call.
+            {status === "ALL"
+              ? "Pick a scenario to run your first training call."
+              : "Try a different status filter."}
           </p>
-          <Link href="/scenarios" className="mt-4">
-            <Button size="sm">Browse scenarios</Button>
-          </Link>
+          {status === "ALL" ? (
+            <Link href="/scenarios" className="mt-4">
+              <Button size="sm">Browse scenarios</Button>
+            </Link>
+          ) : (
+            <Button variant="outline" size="sm" className="mt-4" onClick={() => setStatus("ALL")}>
+              View all
+            </Button>
+          )}
         </div>
       )}
 
-      {sessions && sessions.length > 0 && (
-        <ul className="space-y-3">
-          {sessions.map((session) => (
-            <li key={session.id}>
-              <Card className="py-0 transition-colors duration-100 hover:bg-muted">
-                <CardContent className="flex items-center justify-between gap-4 px-5 py-4">
-                  <div className="min-w-0 space-y-1.5">
-                    <div className="flex items-center gap-2">
-                      <p className="truncate text-sm font-medium text-foreground">
-                        {session.scenario_name}
+      {/* List */}
+      {!isError && sessions.length > 0 && (
+        <>
+          <ul
+            ref={listRef}
+            className={cn(
+              "space-y-3 transition-opacity duration-200",
+              isFetching && "opacity-60"
+            )}
+          >
+            {sessions.map((session) => (
+              <li key={session.id} data-session-row>
+                <Card className="py-0 transition-colors duration-100 hover:bg-muted">
+                  <CardContent className="flex items-center justify-between gap-4 px-5 py-4">
+                    <div className="min-w-0 space-y-1.5">
+                      <div className="flex items-center gap-2">
+                        <p className="truncate text-sm font-medium text-foreground">
+                          {session.scenario_name}
+                        </p>
+                        <StatusBadge status={session.status} />
+                        {session.overall_score !== null && (
+                          <span className="text-xs font-medium text-foreground">
+                            {session.overall_score}%
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {session.persona_name} · {formatDate(session.created_at)}
+                        {isAdmin && ` · ${session.agent_name}`}
                       </p>
-                      <StatusBadge status={session.status} />
-                      {session.overall_score !== null && (
-                        <span className="text-xs font-medium text-foreground">
-                          {session.overall_score}%
-                        </span>
-                      )}
                     </div>
-                    <p className="text-xs text-muted-foreground">
-                      {session.persona_name} · {formatDate(session.created_at)}
-                      {isAdmin && ` · ${session.agent_name}`}
-                    </p>
-                  </div>
-                  {session.status === "completed" && (
-                    <Link href={`/sessions/${session.id}/results`} className="shrink-0">
-                      <Button variant="outline" size="sm">
-                        View results
-                        <ArrowRight className="h-4 w-4" aria-hidden="true" />
-                      </Button>
-                    </Link>
-                  )}
-                </CardContent>
-              </Card>
-            </li>
-          ))}
-        </ul>
+                    {session.status === "completed" && (
+                      <Link href={`/sessions/${session.id}/results`} className="shrink-0">
+                        <Button variant="outline" size="sm">
+                          View results
+                          <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                        </Button>
+                      </Link>
+                    )}
+                  </CardContent>
+                </Card>
+              </li>
+            ))}
+          </ul>
+
+          {/* Pagination */}
+          <nav
+            aria-label="Sessions pagination"
+            className="flex items-center justify-between gap-4 pt-2"
+          >
+            <p className="text-xs text-muted-foreground">
+              Showing{" "}
+              <span className="font-medium text-foreground">
+                {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, total)}
+              </span>{" "}
+              of <span className="font-medium text-foreground">{total}</span>
+            </p>
+
+            <div className="flex items-center gap-1.5">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={page <= 1 || isFetching}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                aria-label="Previous page"
+              >
+                <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+                Prev
+              </Button>
+
+              <div className="flex items-center gap-1">
+                {Array.from({ length: totalPages }, (_, i) => i + 1)
+                  .filter(
+                    (p) =>
+                      p === 1 ||
+                      p === totalPages ||
+                      Math.abs(p - page) <= 1
+                  )
+                  .map((p, idx, arr) => {
+                    const prev = arr[idx - 1];
+                    const gap = prev && p - prev > 1;
+                    return (
+                      <span key={p} className="flex items-center">
+                        {gap && (
+                          <span className="px-1 text-xs text-muted-foreground">…</span>
+                        )}
+                        <button
+                          onClick={() => setPage(p)}
+                          aria-current={p === page ? "page" : undefined}
+                          className={cn(
+                            "flex h-8 min-w-8 items-center justify-center rounded-md px-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                            p === page
+                              ? "bg-primary text-primary-foreground"
+                              : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                          )}
+                        >
+                          {p}
+                        </button>
+                      </span>
+                    );
+                  })}
+              </div>
+
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={page >= totalPages || isFetching}
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                aria-label="Next page"
+              >
+                Next
+                <ChevronRight className="h-4 w-4" aria-hidden="true" />
+              </Button>
+            </div>
+          </nav>
+        </>
       )}
     </div>
   );

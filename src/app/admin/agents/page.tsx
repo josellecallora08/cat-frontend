@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Select } from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -223,37 +224,39 @@ export default function AdminAgentsPage() {
         <Filter className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
         <div className="flex items-center gap-2">
           <label className="text-xs font-medium text-muted-foreground">Agent:</label>
-          <select
+          <Select
+            ariaLabel="Filter by agent"
+            size="sm"
+            className="w-44"
             value={filterAgent}
-            onChange={(e) => {
-              setFilterAgent(e.target.value);
+            onChange={(v) => {
+              setFilterAgent(v);
               setPage(1);
             }}
-            className="rounded-lg border border-border bg-background px-2.5 py-1.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-          >
-            <option value="">All agents</option>
-            {agents?.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.full_name}
-              </option>
-            ))}
-          </select>
+            options={[
+              { value: "", label: "All agents" },
+              ...(agents?.map((a) => ({ value: a.id, label: a.full_name })) ?? []),
+            ]}
+          />
         </div>
         <div className="flex items-center gap-2">
           <label className="text-xs font-medium text-muted-foreground">Status:</label>
-          <select
+          <Select
+            ariaLabel="Filter by status"
+            size="sm"
+            className="w-40"
             value={filterStatus}
-            onChange={(e) => {
-              setFilterStatus(e.target.value);
+            onChange={(v) => {
+              setFilterStatus(v);
               setPage(1);
             }}
-            className="rounded-lg border border-border bg-background px-2.5 py-1.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-          >
-            <option value="">All statuses</option>
-            <option value="completed">Completed</option>
-            <option value="pending">Pending</option>
-            <option value="active">Active</option>
-          </select>
+            options={[
+              { value: "", label: "All statuses" },
+              { value: "completed", label: "Completed" },
+              { value: "pending", label: "Pending" },
+              { value: "active", label: "Active" },
+            ]}
+          />
         </div>
         {(filterAgent || filterStatus) && (
           <button

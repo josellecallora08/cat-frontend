@@ -9,6 +9,7 @@ import { useAuthStore } from "@/stores/auth-store";
 import { useQueryClient, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Select } from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -524,15 +525,16 @@ export default function ScenariosPage() {
               </div>
               <div>
                 <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Gender</label>
-                <select
+                <Select
+                  ariaLabel="Gender"
                   value={genForm.gender}
-                  onChange={(e) => setGenForm({ ...genForm, gender: e.target.value })}
-                  className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                  onChange={(v) => setGenForm({ ...genForm, gender: v })}
                   disabled={genMutation.isPending}
-                >
-                  <option value="female">Female</option>
-                  <option value="male">Male</option>
-                </select>
+                  options={[
+                    { value: "female", label: "Female" },
+                    { value: "male", label: "Male" },
+                  ]}
+                />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -562,16 +564,13 @@ export default function ScenariosPage() {
             </div>
             <div>
               <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Scenario Type</label>
-              <select
+              <Select
+                ariaLabel="Scenario type"
                 value={genForm.scenarioType}
-                onChange={(e) => setGenForm({ ...genForm, scenarioType: e.target.value })}
-                className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                onChange={(v) => setGenForm({ ...genForm, scenarioType: v })}
                 disabled={genMutation.isPending}
-              >
-                {SCENARIO_TYPES.map((t) => (
-                  <option key={t.value} value={t.value}>{t.label}</option>
-                ))}
-              </select>
+                options={SCENARIO_TYPES}
+              />
             </div>
             <div>
               <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Situation / Backstory</label>
