@@ -131,10 +131,60 @@ export default function SessionsPage() {
   const totalPages = data?.total_pages ?? 1;
   const total = data?.total ?? 0;
 
-  // Smooth list transition on data change
+  // Sliding pill indicator for the status filter tabs
+  const tablistRef = useRef<HTMLDivElement>(null);
+  const pillRef = useRef<HTMLSpanElement>(null);
+  const tabRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const prevStatusRef = useRef(status);
+
+  const movePill = (animate: boolean) => {
+    const el = tabRefs.current[status];
+    const pill = pillRef.current;
+    const list = tablistRef.current;
+    if (!el || !pill || !list) return;
+    const listBox = list.getBoundingClientRect();
+    const box = el.getBoundingClientRect();
+    const prefersReduced =
+      typeof window !== "undefined" &&
+      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    gsap.to(pill, {
+      left: box.left - listBox.left,
+      top: box.top - listBox.top,
+      width: box.width,
+      height: box.height,
+      opacity: 1,
+      duration: animate && !prefersReduced ? 0.4 : 0,
+      ease: "power3.out",
+    });
+  };
+
+  useEffect(() => {
+    movePill(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => {
+    movePill(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status]);
+  useEffect(() => {
+    const onResize = () => movePill(false);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Smooth list transition on data change — slides in the direction the pill moved
   const listRef = useRef<HTMLUListElement>(null);
   useEffect(() => {
     if (!listRef.current || sessions.length === 0) return;
+
+    // Direction based on the status tab order
+    const order = statusFilters.map((f) => f.value);
+    const prevIndex = order.indexOf(prevStatusRef.current);
+    const nextIndex = order.indexOf(status);
+    prevStatusRef.current = status;
+    const dir = nextIndex > prevIndex ? 1 : nextIndex < prevIndex ? -1 : 0;
+
     const prefersReduced =
       typeof window !== "undefined" &&
       window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
@@ -144,11 +194,12 @@ export default function SessionsPage() {
     const ctx = gsap.context(() => {
       gsap.fromTo(
         rows,
-        { opacity: 0, y: 12 },
+        { opacity: 0, x: dir * 32, y: dir === 0 ? 12 : 0 },
         {
           opacity: 1,
+          x: 0,
           y: 0,
-          duration: 0.35,
+          duration: 0.38,
           ease: "power3.out",
           stagger: 0.04,
           clearProps: "transform",
@@ -156,7 +207,7 @@ export default function SessionsPage() {
       );
     }, listRef);
     return () => ctx.revert();
-  }, [sessions]);
+  }, [sessions, status]);
 
   return (
     <div className="space-y-6">
@@ -185,22 +236,33 @@ export default function SessionsPage() {
 
       {/* Status filter tabs */}
       <div
+        ref={tablistRef}
         role="tablist"
         aria-label="Filter sessions by status"
-        className="flex flex-wrap items-center gap-1.5 border-b border-border pb-4"
+        className="relative flex flex-wrap items-center gap-1.5 border-b border-border pb-4"
       >
+        {/* Sliding active indicator */}
+        <span
+          ref={pillRef}
+          aria-hidden="true"
+          className="pointer-events-none absolute top-0 left-0 h-9 rounded-full bg-primary"
+          style={{ width: 0, opacity: 0 }}
+        />
         {statusFilters.map((f) => {
           const active = status === f.value;
           return (
             <button
               key={f.value}
+              ref={(el) => {
+                tabRefs.current[f.value] = el;
+              }}
               role="tab"
               aria-selected={active}
               onClick={() => setStatus(f.value)}
               className={cn(
-                "min-h-9 rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                "relative z-10 min-h-9 rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
                 active
-                  ? "bg-primary text-primary-foreground"
+                  ? "text-primary-foreground"
                   : "text-muted-foreground hover:bg-muted hover:text-foreground"
               )}
             >
