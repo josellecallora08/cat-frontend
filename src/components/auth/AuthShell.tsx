@@ -14,11 +14,11 @@ import { LoginForm } from "./LoginForm";
 import { SignupForm } from "./SignupForm";
 import { ResetPasswordForm } from "./ResetPasswordForm";
 
-type AppPhase = "auth" | "loading";
+type AppPhase = "intro" | "auth" | "loading";
 
 export function AuthShell() {
   const router = useRouter();
-  const [phase, setPhase] = useState<AppPhase>("auth");
+  const [phase, setPhase] = useState<AppPhase>("intro");
   const [view, setView] = useState<AuthView>("login");
   const [status, setStatus] = useState<AuthStatus>("idle");
   const [fieldErrors, setFieldErrors] = useState<AuthFieldErrors>({});
@@ -36,6 +36,11 @@ export function AuthShell() {
     sessionStorage.setItem("cat_reveal_dashboard", "1");
     router.push("/");
   }, [router]);
+
+  // Pre-login intro loader finished — reveal the login dock
+  const handleIntroComplete = useCallback(() => {
+    setPhase("auth");
+  }, []);
 
   // Clear errors when user edits a field
   const handleFieldChange = useCallback(() => {
@@ -245,10 +250,21 @@ export function AuthShell() {
 
   return (
     <>
+      {/* Pre-login intro — CAT logo loader shown before the login dock */}
+      {phase === "intro" && (
+        <MascotLoader
+          onComplete={handleIntroComplete}
+          minDuration={2200}
+          text="CATS"
+          subtitle="AI-powered Collection Agent Training System"
+          transition="fade"
+        />
+      )}
+
       {/* Loading phase — shown AFTER successful login, before dashboard */}
       {phase === "loading" && <MascotLoader onComplete={handleLoaderComplete} />}
 
-      {/* Auth page (role select + login form) — shown immediately */}
+      {/* Auth page (login form) — shown after the intro loader */}
       <div
         ref={authPageRef}
         className="fixed inset-0 z-[55] grid place-items-center overflow-auto"
