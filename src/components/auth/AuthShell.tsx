@@ -14,15 +14,11 @@ import { LoginForm } from "./LoginForm";
 import { SignupForm } from "./SignupForm";
 import { ResetPasswordForm } from "./ResetPasswordForm";
 
-type AppPhase = "auth" | "loading";
-type AuthStep = "roleSelect" | "form";
-type UserRole = "admin" | "agent";
+type AppPhase = "intro" | "auth" | "loading";
 
 export function AuthShell() {
   const router = useRouter();
-  const [phase, setPhase] = useState<AppPhase>("auth");
-  const [step, setStep] = useState<AuthStep>("roleSelect");
-  const [selectedRole, setSelectedRole] = useState<UserRole>("agent");
+  const [phase, setPhase] = useState<AppPhase>("intro");
   const [view, setView] = useState<AuthView>("login");
   const [status, setStatus] = useState<AuthStatus>("idle");
   const [fieldErrors, setFieldErrors] = useState<AuthFieldErrors>({});
@@ -30,6 +26,7 @@ export function AuthShell() {
   const [resetSent, setResetSent] = useState(false);
 
   const authPageRef = useRef<HTMLDivElement>(null);
+  const authContentRef = useRef<HTMLDivElement>(null);
   const mascotRef = useRef<HTMLDivElement>(null);
   const starsRef = useRef<HTMLDivElement>(null);
 
@@ -39,6 +36,11 @@ export function AuthShell() {
     sessionStorage.setItem("cat_reveal_dashboard", "1");
     router.push("/");
   }, [router]);
+
+  // Pre-login intro loader finished — reveal the login dock
+  const handleIntroComplete = useCallback(() => {
+    setPhase("auth");
+  }, []);
 
   // Clear errors when user edits a field
   const handleFieldChange = useCallback(() => {
@@ -222,12 +224,46 @@ export function AuthShell() {
     }
   }, [router]);
 
+  // Brief, smooth GSAP entrance for the login dock
+  useEffect(() => {
+    if (phase !== "auth" || !authContentRef.current) return;
+    const prefersReduced =
+      typeof window !== "undefined" &&
+      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    if (prefersReduced) return;
+
+    const children = Array.from(authContentRef.current.children);
+    const ctx = gsap.context(() => {
+      gsap.set(authPageRef.current, { opacity: 0 });
+      gsap.to(authPageRef.current, { opacity: 1, duration: 0.4, ease: "power2.out" });
+      gsap.from(children, {
+        y: 18,
+        opacity: 0,
+        duration: 0.5,
+        ease: "power3.out",
+        stagger: 0.08,
+        delay: 0.1,
+      });
+    });
+    return () => ctx.revert();
+  }, [phase]);
+
   return (
     <>
+      {/* Pre-login intro — CAT logo loader shown before the login dock */}
+      {phase === "intro" && (
+        <MascotLoader
+          onComplete={handleIntroComplete}
+          minDuration={2200}
+          text="CATS"
+          transition="fade"
+        />
+      )}
+
       {/* Loading phase — shown AFTER successful login, before dashboard */}
       {phase === "loading" && <MascotLoader onComplete={handleLoaderComplete} />}
 
-      {/* Auth page (role select + login form) — shown immediately */}
+      {/* Auth page (login form) — shown after the intro loader */}
       <div
         ref={authPageRef}
         className="fixed inset-0 z-[55] grid place-items-center overflow-auto"
@@ -237,6 +273,7 @@ export function AuthShell() {
         }}
       >
         <div
+          ref={authContentRef}
           className="auth-content w-[min(100%,520px)] md:w-[clamp(440px,38vw,560px)] grid place-items-center gap-0 text-center mx-auto"
           style={{
             paddingTop: "24px",
@@ -245,8 +282,7 @@ export function AuthShell() {
             fontFamily: '"SF Compact Rounded", "SF Pro Rounded", ui-rounded, "Arial Rounded MT Bold", system-ui, sans-serif',
           }}
         >
-          {/* Header: Mascot + Title inline — only shown on form step */}
-          {step === "form" && (
+          {/* Header: Mascot + Title inline */}
           <div className="flex items-center gap-3 md:gap-4 mb-1">
             <div
               ref={mascotRef}
@@ -266,51 +302,11 @@ export function AuthShell() {
               CATS
             </h1>
           </div>
-          )}
-          {step === "form" && (
           <p className="m-0 mb-[clamp(20px,3svh,32px)] md:mb-6 text-[10px] md:text-[12px] font-medium opacity-90 text-[#2B2339]">
             AI-powered Collection Agent Training System
           </p>
-          )}
-
-          {/* Role selection step */}
-          {step === "roleSelect" && (
-            <div className="w-full grid gap-6">
-              <h1 className="text-2xl md:text-3xl font-extrabold text-[#2B2339] text-center">Choose your role</h1>
-              <div className="grid grid-cols-2 gap-4">
-                <button
-                  type="button"
-                  onClick={() => { setSelectedRole("agent"); setStep("form"); }}
-                  className="flex flex-col items-center justify-center gap-4 rounded-2xl border-2 border-transparent bg-white/[0.38] px-6 py-8 md:px-8 md:py-10 text-center transition-all hover:bg-white/[0.52] hover:border-[#8F6AE0]/[0.42] hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8F6AE0]/50"
-                >
-                  <span className="w-24 h-24 md:w-28 md:h-28 shrink-0 overflow-visible">
-                    <CatMascotSvg className="w-full h-full" id="role-agent" />
-                  </span>
-                  <div>
-                    <p className="text-sm md:text-base font-bold text-[#2B2339]">Collection Agent</p>
-                    <p className="text-[10px] md:text-xs text-[#2B2339]/60 leading-tight mt-1">Practice calls with AI debtors</p>
-                  </div>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { setSelectedRole("admin"); setStep("form"); }}
-                  className="flex flex-col items-center justify-center gap-4 rounded-2xl border-2 border-transparent bg-white/[0.38] px-6 py-8 md:px-8 md:py-10 text-center transition-all hover:bg-white/[0.52] hover:border-[#8F6AE0]/[0.42] hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8F6AE0]/50"
-                >
-                  <span className="w-24 h-24 md:w-28 md:h-28 shrink-0">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src="/cat2.svg" alt="" className="w-full h-full object-contain" aria-hidden="true" />
-                  </span>
-                  <div>
-                    <p className="text-sm md:text-base font-bold text-[#2B2339]">Administrator</p>
-                    <p className="text-[10px] md:text-xs text-[#2B2339]/60 leading-tight mt-1">Manage scenarios & monitor agents</p>
-                  </div>
-                </button>
-              </div>
-            </div>
-          )}
 
           {/* Auth forms */}
-          {step === "form" && (
           <div className="w-full max-w-[342px] md:max-w-[360px] grid gap-[10px] md:gap-[14px]">
             {/* Live region for screen readers */}
             <div className="sr-only" role="alert" aria-live="assertive" aria-atomic="true">
@@ -322,14 +318,12 @@ export function AuthShell() {
                 status={status}
                 fieldErrors={fieldErrors}
                 buttonMessage={buttonMessage}
-                role={selectedRole}
                 onSubmit={handleLogin}
                 onForgotPassword={() => switchView("reset")}
                 onSignup={() => switchView("signup")}
                 onGoogle={handleGoogle}
                 onLark={handleLark}
                 onFieldChange={handleFieldChange}
-                onBackToRoles={() => { setStep("roleSelect"); switchView("login"); }}
               />
             )}
 
@@ -357,7 +351,6 @@ export function AuthShell() {
             )}
 
           </div>
-          )}
         </div>
       </div>
 

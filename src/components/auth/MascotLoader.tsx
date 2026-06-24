@@ -8,6 +8,12 @@ interface MascotLoaderProps {
   onComplete: () => void;
   /** Minimum display time in ms before allowing completion */
   minDuration?: number;
+  /** Primary shimmer text under the mascot */
+  text?: string;
+  /** Optional subtitle shown below the primary text */
+  subtitle?: string;
+  /** Exit transition: "circle" expands a purple takeover; "fade" simply fades out */
+  transition?: "circle" | "fade";
 }
 
 const whiskerShapes = [
@@ -19,7 +25,13 @@ const whiskerShapes = [
   { target: ".wave-left-low", base: "M10.65 25.95C9.45 26.25 8.38 26.72 7.35 27.12", crest: "M10.65 25.95C9.45 26.85 8.38 26.18 7.35 27.12", trough: "M10.65 25.95C9.42 25.72 8.38 27.18 7.35 27.12" },
 ];
 
-export function MascotLoader({ onComplete, minDuration = 2400 }: MascotLoaderProps) {
+export function MascotLoader({
+  onComplete,
+  minDuration = 2400,
+  text = "Purring",
+  subtitle,
+  transition = "circle",
+}: MascotLoaderProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const takeoverRef = useRef<HTMLDivElement>(null);
   const timelineRef = useRef<gsap.core.Timeline | null>(null);
@@ -192,7 +204,36 @@ export function MascotLoader({ onComplete, minDuration = 2400 }: MascotLoaderPro
   const playTransition = useCallback(() => {
     const container = containerRef.current;
     const takeover = takeoverRef.current;
-    if (!container || !takeover) {
+    if (!container) {
+      onComplete();
+      return;
+    }
+
+    // Simple fade-out (no expanding circle) — used for the pre-login intro
+    if (transition === "fade") {
+      if (prefersReduced) {
+        gsap.to(container, { autoAlpha: 0, duration: 0.4, onComplete });
+        return;
+      }
+      gsap
+        .timeline({ defaults: { ease: "power2.inOut" } })
+        .to(container.querySelector(".loading-text-group"), {
+          autoAlpha: 0,
+          y: 8,
+          duration: 0.28,
+          ease: "sine.out",
+        })
+        .to(
+          container.querySelector(".cat-mascot-svg"),
+          { scale: 1.06, y: -4, duration: 0.24, ease: "power2.out" },
+          "<"
+        )
+        .to(container, { autoAlpha: 0, duration: 0.4, ease: "sine.out" }, "-=0.05")
+        .call(() => onComplete());
+      return;
+    }
+
+    if (!takeover) {
       onComplete();
       return;
     }
@@ -250,7 +291,7 @@ export function MascotLoader({ onComplete, minDuration = 2400 }: MascotLoaderPro
       // Fade out the entire loading stage (cat fades AFTER takeover covers most of screen)
       .to(container, { autoAlpha: 0, duration: 0.32, ease: "sine.out" }, "-=0.06")
       .call(() => onComplete());
-  }, [onComplete, prefersReduced]);
+  }, [onComplete, prefersReduced, transition]);
 
   return (
     <>
@@ -261,12 +302,14 @@ export function MascotLoader({ onComplete, minDuration = 2400 }: MascotLoaderPro
         aria-hidden="true"
       />
 
-      {/* Purple takeover circle — expands from cat center, BEHIND the cat but IN FRONT of gradient */}
-      <div
-        ref={takeoverRef}
-        className="fixed w-10 h-10 rounded-full bg-[#8F6AE0] z-[58] opacity-0 pointer-events-none -translate-x-1/2 -translate-y-1/2"
-        aria-hidden="true"
-      />
+      {/* Purple takeover circle — only used by the "circle" exit transition */}
+      {transition === "circle" && (
+        <div
+          ref={takeoverRef}
+          className="fixed w-10 h-10 rounded-full bg-[#8F6AE0] z-[58] opacity-0 pointer-events-none -translate-x-1/2 -translate-y-1/2"
+          aria-hidden="true"
+        />
+      )}
 
       {/* Cat + text layer — sits in front of takeover so cat details stay visible */}
       <div
@@ -274,19 +317,31 @@ export function MascotLoader({ onComplete, minDuration = 2400 }: MascotLoaderPro
         className="fixed inset-0 z-[60] grid place-items-center pointer-events-none"
         aria-label="Loading"
       >
-        <div className="w-[min(30vw,168px)] min-w-[88px] grid place-items-center gap-[14px]">
+        <div className="w-[min(34vw,200px)] min-w-[100px] grid place-items-center gap-[16px]">
           <div className="cat-mascot-svg relative z-[2] w-full h-auto overflow-visible">
             <CatMascotSvg id="loader" className="w-full h-auto" />
           </div>
-          <p
-            className="loading-text relative z-[2] m-0 whitespace-nowrap text-[clamp(14px,2.7vw,18px)] font-bold leading-[1.35] text-[#2B2339] px-[2px] pb-1"
-            data-text="Purring"
-            style={{
-              fontFamily: '"SF Compact Rounded", "SF Pro Rounded", ui-rounded, "Arial Rounded MT Bold", system-ui, sans-serif',
-            }}
-          >
-            Purring
-          </p>
+          <div className="loading-text-group relative z-[2] grid place-items-center gap-1 text-center">
+            <p
+              className="loading-text m-0 whitespace-nowrap text-[clamp(20px,3.4vw,30px)] font-extrabold leading-[1.2] text-[#2B2339] px-[2px]"
+              data-text={text}
+              style={{
+                fontFamily: '"SF Compact Rounded", "SF Pro Rounded", ui-rounded, "Arial Rounded MT Bold", system-ui, sans-serif',
+              }}
+            >
+              {text}
+            </p>
+            {subtitle && (
+              <p
+                className="m-0 text-[clamp(10px,1.7vw,13px)] font-medium leading-[1.4] text-[#2B2339]/70 px-2"
+                style={{
+                  fontFamily: '"SF Compact Rounded", "SF Pro Rounded", ui-rounded, "Arial Rounded MT Bold", system-ui, sans-serif',
+                }}
+              >
+                {subtitle}
+              </p>
+            )}
+          </div>
         </div>
       </div>
 

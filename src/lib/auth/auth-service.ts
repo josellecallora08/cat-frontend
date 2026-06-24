@@ -23,6 +23,8 @@ function mapErrorToCode(status: number, detail?: string): AuthErrorCode {
     return "ACCOUNT_UNVERIFIED";
   if (status === 429) return "TOO_MANY_ATTEMPTS";
   if (status === 409) return "EMAIL_ALREADY_USED";
+  if (status === 400 && detail?.toLowerCase().includes("already"))
+    return "EMAIL_ALREADY_USED";
   if (status >= 500) return "SERVER_ERROR";
   return "SERVER_ERROR";
 }
