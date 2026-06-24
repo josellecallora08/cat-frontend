@@ -256,7 +256,6 @@ export function AuthShell() {
           onComplete={handleIntroComplete}
           minDuration={2200}
           text="CATS"
-          subtitle="AI-powered Collection Agent Training System"
           transition="fade"
         />
       )}
