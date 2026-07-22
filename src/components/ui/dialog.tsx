@@ -14,11 +14,12 @@ function DialogContent({
   className,
   children,
   showClose = true,
+  backdropClassName,
   ...props
-}: DialogPrimitive.Popup.Props & { showClose?: boolean }) {
+}: DialogPrimitive.Popup.Props & { showClose?: boolean; backdropClassName?: string }) {
   return (
     <DialogPortal>
-      <DialogPrimitive.Backdrop className="fixed inset-0 z-50 bg-foreground/40 transition-opacity duration-150 data-[ending-style]:opacity-0 data-[starting-style]:opacity-0 motion-reduce:transition-none" />
+      <DialogPrimitive.Backdrop className={cn("fixed inset-0 z-50 bg-foreground/40 transition-opacity duration-150 data-[ending-style]:opacity-0 data-[starting-style]:opacity-0 motion-reduce:transition-none", backdropClassName)} />
       <DialogPrimitive.Popup
         className={cn(
           "fixed left-1/2 top-1/2 z-50 grid w-full max-w-md -translate-x-1/2 -translate-y-1/2 gap-4 rounded-lg border border-border bg-card p-6 shadow-lg transition-all duration-150 ease-out",
@@ -74,12 +75,7 @@ function DialogDescription({ className, ...props }: DialogPrimitive.Description.
 }
 
 export {
-  Dialog,
-  DialogTrigger,
-  DialogClose,
-  DialogContent,
-  DialogHeader,
-  DialogFooter,
-  DialogTitle,
-  DialogDescription,
+    Dialog, DialogClose,
+    DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger
 };
+
