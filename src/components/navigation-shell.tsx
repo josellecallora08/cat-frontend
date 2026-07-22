@@ -1,13 +1,13 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback, useLayoutEffect } from "react";
-import { usePathname, useRouter } from "next/navigation";
-import { LayoutGrid, Mic, Users, TrendingUp, Settings, LogOut, User } from "lucide-react";
-import gsap from "gsap";
-import { useAuthStore } from "@/stores/auth-store";
+import GradualBlur from "@/components/react-bits/GradualBlur";
 import { useScroll } from "@/hooks/use-scroll";
 import { cn } from "@/lib/utils";
-import GradualBlur from "@/components/react-bits/GradualBlur";
+import { useAuthStore } from "@/stores/auth-store";
+import gsap from "gsap";
+import { LayoutGrid, LogOut, Megaphone, Mic, Settings, TrendingUp, User, Users } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 const agentNavItems = [
   { href: "/", label: "Dashboard", icon: TrendingUp },
@@ -17,6 +17,7 @@ const agentNavItems = [
 
 const adminNavItems = [
   { href: "/admin/agents", label: "Agents", icon: Users },
+  { href: "/admin/campaigns", label: "Campaigns", icon: Megaphone },
 ];
 
 export function NavigationShell({ children }: { children: React.ReactNode }) {

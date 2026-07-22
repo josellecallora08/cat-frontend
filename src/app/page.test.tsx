@@ -1,10 +1,10 @@
+import { mockScenarios } from "@/test/mocks/handlers";
+import { server } from "@/test/mocks/server";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { http, HttpResponse } from "msw";
-import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
-import { server } from "@/test/mocks/server";
-import { mockScenarios } from "@/test/mocks/handlers";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import HomePage from "./page";
 
 // Mock next/link to render as a simple anchor
