@@ -13,7 +13,8 @@ export interface AuthResult {
       id: string;
       email: string;
       full_name: string;
-      role: "admin" | "agent";
+      role: "admin" | "user";
+      user_type: "trainer" | "agent" | null;
       is_active: boolean;
     };
   };

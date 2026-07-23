@@ -2,13 +2,15 @@ import { create } from "zustand";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
 
-export type UserRole = "admin" | "agent";
+export type UserRole = "admin" | "user";
+export type UserType = "trainer" | "agent";
 
 export interface AuthUser {
   id: string;
   email: string;
   full_name: string;
   role: UserRole;
+  user_type: UserType | null;
   is_active: boolean;
 }
 

@@ -86,16 +86,36 @@ interface AgentRanking {
 
 // --- API ---
 
-async function fetchDashboard(agentId?: string): Promise<DashboardData> {
+async function fetchDashboard(
+  agentId?: string,
+  token?: string
+): Promise<DashboardData> {
   const params = agentId ? `?agent_id=${agentId}` : "";
-  const res = await fetch(`${API_BASE_URL}/api/dashboard${params}`);
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+  const res = await fetch(
+    `${API_BASE_URL}/api/dashboard${params}`,
+    { headers }
+  );
   if (!res.ok) throw new Error("Failed to fetch dashboard");
   return res.json();
 }
 
-async function fetchScoreHistory(agentId?: string): Promise<ScoreDataPoint[]> {
+async function fetchScoreHistory(
+  agentId?: string,
+  token?: string
+): Promise<ScoreDataPoint[]> {
   const params = agentId ? `?agent_id=${agentId}` : "";
-  const res = await fetch(`${API_BASE_URL}/api/dashboard/score-history${params}`);
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+  const res = await fetch(
+    `${API_BASE_URL}/api/dashboard/score-history${params}`,
+    { headers }
+  );
   if (!res.ok) return [];
   return res.json();
 }
@@ -163,19 +183,20 @@ function getRankBadge(rank: number) {
 
 export default function DashboardPage() {
   const user = useAuthStore((s) => s.user);
+  const token = useAuthStore((s) => s.token);
   const isAdmin = user?.role === "admin";
   // Agents only see their own data; admins see everything
   const agentFilter = !isAdmin && user?.id ? user.id : undefined;
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ["dashboard", agentFilter],
-    queryFn: () => fetchDashboard(agentFilter),
+    queryFn: () => fetchDashboard(agentFilter, token ?? undefined),
     refetchInterval: 30000,
   });
 
   const { data: scoreHistory } = useQuery({
     queryKey: ["score-history", agentFilter],
-    queryFn: () => fetchScoreHistory(agentFilter),
+    queryFn: () => fetchScoreHistory(agentFilter, token ?? undefined),
   });
 
   const { data: leaderboard } = useQuery({

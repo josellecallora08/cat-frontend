@@ -30,8 +30,17 @@ export class ScenarioIncompleteProfileError extends Error {
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
 
-export async function fetchScenarios(): Promise<ScenarioListItem[]> {
-  const response = await fetch(`${API_BASE_URL}/api/scenarios`);
+export async function fetchScenarios(token?: string): Promise<ScenarioListItem[]> {
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+
+  const response = await fetch(`${API_BASE_URL}/api/scenarios`, { headers });
+
+  if (response.status === 401) {
+    throw new Error("Authentication required");
+  }
 
   if (!response.ok) {
     throw new Error(`Failed to fetch scenarios: ${response.status}`);
