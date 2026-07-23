@@ -257,9 +257,6 @@ describe("AdminCampaignsPage", () => {
       expect(screen.getByText("Name is required")).toBeInTheDocument();
     });
 
-    expect(screen.getByText("Start date is required")).toBeInTheDocument();
-    expect(screen.getByText("End date is required")).toBeInTheDocument();
-    expect(screen.getByText("Select at least one scenario")).toBeInTheDocument();
     expect(screen.getByText("Select at least one agent")).toBeInTheDocument();
   });
 
@@ -314,9 +311,7 @@ describe("AdminCampaignsPage", () => {
     const dialogEl = dialog as HTMLElement;
     expect(within(dialogEl).getByText("Name")).toBeInTheDocument();
     expect(within(dialogEl).getByText("Description")).toBeInTheDocument();
-    expect(within(dialogEl).getByText("Start Date")).toBeInTheDocument();
-    expect(within(dialogEl).getByText("End Date")).toBeInTheDocument();
-    expect(within(dialogEl).getByText("Scenarios")).toBeInTheDocument();
+    expect(within(dialogEl).getByText("Status")).toBeInTheDocument();
     expect(within(dialogEl).getByText("Agents")).toBeInTheDocument();
   });
 

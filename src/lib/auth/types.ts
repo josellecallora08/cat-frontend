@@ -12,7 +12,9 @@ export type AuthErrorCode =
   | "SERVER_ERROR"
   | "EMAIL_ALREADY_USED"
   | "RESET_LINK_EXPIRED"
-  | "SESSION_EXPIRED";
+  | "SESSION_EXPIRED"
+  | "LARK_AUTH_FAILED"
+  | "LARK_NOT_CONFIGURED";
 
 export interface AuthFieldErrors {
   email?: string;

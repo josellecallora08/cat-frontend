@@ -1,12 +1,13 @@
 "use client";
 
+import Image from "next/image";
+
 interface SocialAuthButtonsProps {
-  onGoogle: () => void;
   onLark: () => void;
   disabled?: boolean;
 }
 
-export function SocialAuthButtons({ onGoogle, onLark, disabled }: SocialAuthButtonsProps) {
+export function SocialAuthButtons({ onLark, disabled }: SocialAuthButtonsProps) {
   return (
     <div className="grid gap-[10px] md:gap-[14px]">
       {/* Divider */}
@@ -16,42 +17,16 @@ export function SocialAuthButtons({ onGoogle, onLark, disabled }: SocialAuthButt
         <span className="h-px bg-[#2B2339]/[0.12]" aria-hidden="true" />
       </div>
 
-      {/* Social buttons */}
-      <div className="grid grid-cols-2 gap-4">
-        <button
-          type="button"
-          onClick={onGoogle}
-          disabled={disabled}
-          className="h-9 md:h-12 rounded-full border-2 border-[#8F6AE0]/[0.42] bg-white/[0.18] inline-flex items-center justify-center transition-all hover:border-[#8F6AE0]/[0.68] hover:bg-white/[0.3] hover:-translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8F6AE0]/50 disabled:opacity-50 disabled:pointer-events-none"
-        >
-          <span className="w-5 h-5 md:w-6 md:h-6 inline-grid place-items-center" aria-hidden="true">
-            <svg viewBox="0 0 24 24" className="w-full h-full">
-              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
-              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
-              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
-              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
-            </svg>
-          </span>
-          <span className="sr-only">Continue with Google</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={onLark}
-          disabled={disabled}
-          className="h-9 md:h-12 rounded-full border-2 border-[#8F6AE0]/[0.42] bg-white/[0.18] inline-flex items-center justify-center transition-all hover:border-[#8F6AE0]/[0.68] hover:bg-white/[0.3] hover:-translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8F6AE0]/50 disabled:opacity-50 disabled:pointer-events-none"
-        >
-          <span className="w-5 h-5 md:w-6 md:h-6 inline-grid place-items-center" aria-hidden="true">
-            <svg viewBox="0 0 48 48" className="w-full h-full">
-              <path fill="#3370FF" d="M9.6 16.65v12.45c0 5.4 4.35 9.75 9.75 9.75h6.75L9.6 16.65z" />
-              <path fill="#00D6B9" d="M21.75 8.7h12.15c3 0 4.8 3.3 3.15 5.85l-4.8 7.35L21.75 8.7z" />
-              <path fill="#2452B8" d="M26.1 38.85h4.35c3.3 0 6.3-1.65 8.1-4.35l6-9.15c1.2-1.95-.15-4.5-2.4-4.5H32.25L26.1 38.85z" />
-              <path fill="#14C8C8" d="M21.75 8.7h-7.2c-3.3 0-5.55 3.6-3.75 6.3l15.15 23.85 6.15-16.95-10.35-13.2z" />
-            </svg>
-          </span>
-          <span className="sr-only">Continue with Lark</span>
-        </button>
-      </div>
+      {/* Lark sign-in button */}
+      <button
+        type="button"
+        onClick={onLark}
+        disabled={disabled}
+        className="w-full h-9 md:h-12 rounded-full border-2 border-[#8F6AE0]/[0.42] bg-white/[0.18] inline-flex items-center justify-center gap-2 transition-all hover:border-[#8F6AE0]/[0.68] hover:bg-white/[0.3] hover:-translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8F6AE0]/50 disabled:opacity-50 disabled:pointer-events-none"
+      >
+        <Image src="/lark-icon.webp" alt="" width={20} height={20} className="md:w-6 md:h-6" />
+        <span className="text-xs md:text-sm font-semibold text-[#2B2339]/80">Continue with Lark</span>
+      </button>
     </div>
   );
 }

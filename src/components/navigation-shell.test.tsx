@@ -1,5 +1,5 @@
 import { render, screen } from "@testing-library/react";
-import { describe, it, expect, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { NavigationShell } from "./navigation-shell";
 
 // Mock next/navigation
@@ -11,9 +11,27 @@ vi.mock("next/navigation", () => ({
 // Mock next/image to a plain img (static SVG import lacks width/height in tests)
 vi.mock("next/image", () => ({
   default: ({ alt, ...props }: { alt: string; [key: string]: unknown }) => (
-    // eslint-disable-next-line @next/next/no-img-element, jsx-a11y/alt-text
     <img alt={alt} {...(props as Record<string, unknown>)} />
   ),
+}));
+
+// Mock GSAP to avoid animation issues in tests
+vi.mock("gsap", () => ({
+  default: {
+    set: vi.fn(),
+    to: vi.fn(),
+    fromTo: vi.fn(),
+  },
+}));
+
+// Mock the GradualBlur component
+vi.mock("@/components/react-bits/GradualBlur", () => ({
+  default: () => null,
+}));
+
+// Mock use-scroll hook
+vi.mock("@/hooks/use-scroll", () => ({
+  useScroll: () => false,
 }));
 
 describe("NavigationShell", () => {
@@ -25,7 +43,7 @@ describe("NavigationShell", () => {
     );
 
     expect(
-      screen.getByAltText("CATS - Collection Agent Trainer System")
+      screen.getByLabelText("CATS")
     ).toBeInTheDocument();
   });
 
@@ -36,9 +54,9 @@ describe("NavigationShell", () => {
       </NavigationShell>
     );
 
+    expect(screen.getByText("Dashboard")).toBeInTheDocument();
     expect(screen.getByText("Scenarios")).toBeInTheDocument();
     expect(screen.getByText("Sessions")).toBeInTheDocument();
-    expect(screen.getByText("Results")).toBeInTheDocument();
   });
 
   it("renders children content", () => {

@@ -1,3 +1,5 @@
+import { getLarkAuthorizeUrl, larkCallback } from "@/lib/api/auth";
+
 import type { AuthErrorCode } from "./types";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
@@ -89,13 +91,36 @@ export const authService = {
     }
   },
 
-  async loginWithGoogle(): Promise<AuthResult> {
-    // Placeholder for OAuth flow
-    return { success: false, errorCode: "SERVER_ERROR" };
+  async loginWithLark(): Promise<AuthResult> {
+    try {
+      const { authorize_url, state } = await getLarkAuthorizeUrl();
+      sessionStorage.setItem("lark_oauth_state", state);
+      window.location.href = authorize_url;
+      return { success: true };
+    } catch {
+      return { success: false, errorCode: "LARK_NOT_CONFIGURED" };
+    }
   },
 
-  async loginWithLark(): Promise<AuthResult> {
-    // Placeholder for OAuth flow
-    return { success: false, errorCode: "SERVER_ERROR" };
+  async completeLarkOAuth(code: string, state: string): Promise<AuthResult> {
+    const storedState = sessionStorage.getItem("lark_oauth_state");
+    sessionStorage.removeItem("lark_oauth_state");
+
+    if (!storedState || storedState !== state) {
+      return { success: false, errorCode: "LARK_AUTH_FAILED" };
+    }
+
+    try {
+      const data = await larkCallback(code, state);
+      return {
+        success: true,
+        data: {
+          access_token: data.access_token,
+          user: data.user as NonNullable<AuthResult["data"]>["user"],
+        },
+      };
+    } catch {
+      return { success: false, errorCode: "LARK_AUTH_FAILED" };
+    }
   },
 };

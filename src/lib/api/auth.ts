@@ -1,5 +1,5 @@
 /**
- * Authentication API client for OAuth flows (Lark and Google).
+ * Authentication API client for Lark OAuth flow.
  */
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
@@ -49,30 +49,3 @@ export async function larkCallback(code: string, state: string): Promise<TokenRe
   return resp.json();
 }
 
-/**
- * Get the Google OAuth authorization URL and state.
- */
-export async function getGoogleAuthorizeUrl(): Promise<AuthorizeResponse> {
-  const resp = await fetch(`${API_BASE_URL}/api/auth/google/authorize`);
-  if (!resp.ok) {
-    const data = await resp.json().catch(() => ({}));
-    throw new Error(data.detail || "Failed to get Google authorize URL");
-  }
-  return resp.json();
-}
-
-/**
- * Exchange a Google authorization code for a CAT JWT.
- */
-export async function googleCallback(code: string, state: string): Promise<TokenResponse> {
-  const resp = await fetch(`${API_BASE_URL}/api/auth/google/callback`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ code, state }),
-  });
-  if (!resp.ok) {
-    const data = await resp.json().catch(() => ({}));
-    throw new Error(data.detail || "Google authentication failed");
-  }
-  return resp.json();
-}

@@ -1,18 +1,19 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect } from "react";
-import { useRouter } from "next/navigation";
-import gsap from "gsap";
-import type { AuthView, AuthStatus, AuthFieldErrors } from "@/lib/auth/types";
-import { authMessages } from "@/lib/auth/messages";
-import { validateLogin, validateSignup, validateReset } from "@/lib/auth/validation";
 import { authService } from "@/lib/auth/auth-service";
+import { authMessages } from "@/lib/auth/messages";
+import type { AuthFieldErrors, AuthStatus, AuthView } from "@/lib/auth/types";
+import { validateLogin, validateReset, validateSignup } from "@/lib/auth/validation";
 import { useAuthStore } from "@/stores/auth-store";
-import { MascotLoader } from "./MascotLoader";
+import gsap from "gsap";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import { CatMascotSvg } from "./CatMascotSvg";
 import { LoginForm } from "./LoginForm";
-import { SignupForm } from "./SignupForm";
+import { MascotLoader } from "./MascotLoader";
 import { ResetPasswordForm } from "./ResetPasswordForm";
+import { SignupForm } from "./SignupForm";
 
 type AppPhase = "intro" | "auth" | "loading";
 
@@ -40,6 +41,33 @@ export function AuthShell() {
   // Pre-login intro loader finished — reveal the login dock
   const handleIntroComplete = useCallback(() => {
     setPhase("auth");
+  }, []);
+
+  // Success animation with stars
+  const playSuccessAnimation = useCallback(() => {
+    const mascot = mascotRef.current;
+    const starsEl = starsRef.current;
+    if (!mascot || !starsEl) return;
+
+    const stars = starsEl.querySelectorAll(".success-star");
+    const svg = mascot.querySelector("svg");
+
+    gsap.killTweensOf([stars, svg]);
+    gsap.set(stars, { autoAlpha: 0, scale: 0, rotation: -28, y: 6 });
+
+    gsap.timeline()
+      .to(svg, { scale: 1.08, y: -8, duration: 0.22, ease: "back.out(2)" })
+      .to(stars, {
+        autoAlpha: 1, scale: 1, rotation: 0, y: 0,
+        duration: 0.28, stagger: 0.08, ease: "back.out(2.2)",
+      }, "-=0.08")
+      .to(svg, { scale: 1, y: 0, duration: 0.34, ease: "elastic.out(1, 0.45)" }, "-=0.1")
+      .to(stars, {
+        scale: 1.22, rotation: 18, duration: 0.42,
+        repeat: -1, yoyo: true,
+        stagger: { each: 0.11, repeat: -1, yoyo: true },
+        ease: "sine.inOut",
+      }, "-=0.18");
   }, []);
 
   // Clear errors when user edits a field
@@ -81,6 +109,10 @@ export function AuthShell() {
         if (code === "INVALID_CREDENTIALS") {
           setFieldErrors({ email: " ", password: " " });
         }
+        // Show toast for server/network errors
+        if (code === "SERVER_ERROR" || code === "NETWORK_ERROR" || code === "TOO_MANY_ATTEMPTS") {
+          toast.error(authMessages[code]);
+        }
         return;
       }
 
@@ -95,6 +127,7 @@ export function AuthShell() {
       }
 
       setStatus("success");
+      toast.success("Logged in successfully");
       playSuccessAnimation();
 
       // Show loading screen, then navigate to dashboard
@@ -102,7 +135,7 @@ export function AuthShell() {
         setPhase("loading");
       }, 1200);
     },
-    [router]
+    [playSuccessAnimation]
   );
 
   // Signup handler
@@ -163,56 +196,16 @@ export function AuthShell() {
     []
   );
 
-  // Social login handlers
-  const handleGoogle = useCallback(async () => {
-    setStatus("submitting");
-    const result = await authService.loginWithGoogle();
-    if (!result.success) {
-      setStatus("error");
-      setButtonMessage(authMessages[result.errorCode!]);
-      return;
-    }
-    setStatus("success");
-    playSuccessAnimation();
-  }, []);
-
+  // Lark login handler
   const handleLark = useCallback(async () => {
     setStatus("submitting");
     const result = await authService.loginWithLark();
     if (!result.success) {
-      setStatus("error");
-      setButtonMessage(authMessages[result.errorCode!]);
+      setStatus("idle");
+      toast.error(authMessages[result.errorCode!]);
       return;
     }
-    setStatus("success");
-    playSuccessAnimation();
-  }, []);
-
-  // Success animation with stars
-  const playSuccessAnimation = useCallback(() => {
-    const mascot = mascotRef.current;
-    const starsEl = starsRef.current;
-    if (!mascot || !starsEl) return;
-
-    const stars = starsEl.querySelectorAll(".success-star");
-    const svg = mascot.querySelector("svg");
-
-    gsap.killTweensOf([stars, svg]);
-    gsap.set(stars, { autoAlpha: 0, scale: 0, rotation: -28, y: 6 });
-
-    gsap.timeline()
-      .to(svg, { scale: 1.08, y: -8, duration: 0.22, ease: "back.out(2)" })
-      .to(stars, {
-        autoAlpha: 1, scale: 1, rotation: 0, y: 0,
-        duration: 0.28, stagger: 0.08, ease: "back.out(2.2)",
-      }, "-=0.08")
-      .to(svg, { scale: 1, y: 0, duration: 0.34, ease: "elastic.out(1, 0.45)" }, "-=0.1")
-      .to(stars, {
-        scale: 1.22, rotation: 18, duration: 0.42,
-        repeat: -1, yoyo: true,
-        stagger: { each: 0.11, repeat: -1, yoyo: true },
-        ease: "sine.inOut",
-      }, "-=0.18");
+    // Browser will redirect to Lark — no need to handle success here
   }, []);
 
   // If user is already logged in, redirect
@@ -321,7 +314,6 @@ export function AuthShell() {
                 onSubmit={handleLogin}
                 onForgotPassword={() => switchView("reset")}
                 onSignup={() => switchView("signup")}
-                onGoogle={handleGoogle}
                 onLark={handleLark}
                 onFieldChange={handleFieldChange}
               />

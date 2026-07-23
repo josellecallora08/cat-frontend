@@ -9,6 +9,7 @@ import { use, useCallback, useState } from "react";
 import type { AgentOption, AgentWithRole } from "@/components/agent-dropdown";
 import { AgentDropdown } from "@/components/agent-dropdown";
 import { CampaignDashboard } from "@/components/campaign-dashboard";
+import { ScenarioManagementSection } from "@/components/campaign/scenario-management-section";
 import { PageContent } from "@/components/page-content";
 import { PageError } from "@/components/page-error";
 import { PageHeader } from "@/components/page-header";
@@ -290,6 +291,13 @@ export default function CampaignDetailPage({
 
       {/* Campaign Dashboard */}
       <CampaignDashboard campaignId={id} />
+
+      {/* Scenario Management */}
+      <ScenarioManagementSection
+        campaignId={id}
+        scenarios={campaign.scenarios}
+        campaignStatus={campaign.status}
+      />
 
       {/* Edit Dialog */}
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
