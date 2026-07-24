@@ -5,7 +5,7 @@ import { useScroll } from "@/hooks/use-scroll";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth-store";
 import gsap from "gsap";
-import { LayoutGrid, LogOut, Megaphone, Mic, Settings, TrendingUp, User, Users } from "lucide-react";
+import { LayoutGrid, LogOut, Megaphone, Mic, Settings, TrendingUp, User, Users, UsersRound } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 
@@ -16,6 +16,7 @@ const agentNavItems = [
 ];
 
 const adminNavItems = [
+  { href: "/admin/users", label: "Users", icon: UsersRound },
   { href: "/admin/agents", label: "Agents", icon: Users },
   { href: "/admin/campaigns", label: "Campaigns", icon: Megaphone },
 ];

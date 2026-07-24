@@ -1,38 +1,38 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { useAuthStore } from "@/stores/auth-store";
 import { useQuery } from "@tanstack/react-query";
 import {
-  AreaChart,
-  Area,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Legend,
-  RadarChart,
-  PolarGrid,
-  PolarAngleAxis,
-  PolarRadiusAxis,
-  Radar,
-  Cell,
-} from "recharts";
-import Link from "next/link";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { useAuthStore } from "@/stores/auth-store";
-import {
-  TrendingUp,
-  Target,
-  MessageSquare,
-  LayoutGrid,
-  AlertCircle,
-  Trophy,
-  Medal,
-  Phone,
+    AlertCircle,
+    LayoutGrid,
+    Medal,
+    MessageSquare,
+    Phone,
+    Target,
+    TrendingUp,
+    Trophy,
 } from "lucide-react";
+import Link from "next/link";
+import {
+    Area,
+    AreaChart,
+    Bar,
+    BarChart,
+    CartesianGrid,
+    Cell,
+    Legend,
+    PolarAngleAxis,
+    PolarGrid,
+    PolarRadiusAxis,
+    Radar,
+    RadarChart,
+    ResponsiveContainer,
+    Tooltip,
+    XAxis,
+    YAxis,
+} from "recharts";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
 
@@ -86,16 +86,36 @@ interface AgentRanking {
 
 // --- API ---
 
-async function fetchDashboard(agentId?: string): Promise<DashboardData> {
+async function fetchDashboard(
+  agentId?: string,
+  token?: string
+): Promise<DashboardData> {
   const params = agentId ? `?agent_id=${agentId}` : "";
-  const res = await fetch(`${API_BASE_URL}/api/dashboard${params}`);
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+  const res = await fetch(
+    `${API_BASE_URL}/api/dashboard${params}`,
+    { headers }
+  );
   if (!res.ok) throw new Error("Failed to fetch dashboard");
   return res.json();
 }
 
-async function fetchScoreHistory(agentId?: string): Promise<ScoreDataPoint[]> {
+async function fetchScoreHistory(
+  agentId?: string,
+  token?: string
+): Promise<ScoreDataPoint[]> {
   const params = agentId ? `?agent_id=${agentId}` : "";
-  const res = await fetch(`${API_BASE_URL}/api/dashboard/score-history${params}`);
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+  const res = await fetch(
+    `${API_BASE_URL}/api/dashboard/score-history${params}`,
+    { headers }
+  );
   if (!res.ok) return [];
   return res.json();
 }
@@ -163,19 +183,20 @@ function getRankBadge(rank: number) {
 
 export default function DashboardPage() {
   const user = useAuthStore((s) => s.user);
+  const token = useAuthStore((s) => s.token);
   const isAdmin = user?.role === "admin";
   // Agents only see their own data; admins see everything
   const agentFilter = !isAdmin && user?.id ? user.id : undefined;
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ["dashboard", agentFilter],
-    queryFn: () => fetchDashboard(agentFilter),
+    queryFn: () => fetchDashboard(agentFilter, token ?? undefined),
     refetchInterval: 30000,
   });
 
   const { data: scoreHistory } = useQuery({
     queryKey: ["score-history", agentFilter],
-    queryFn: () => fetchScoreHistory(agentFilter),
+    queryFn: () => fetchScoreHistory(agentFilter, token ?? undefined),
   });
 
   const { data: leaderboard } = useQuery({
@@ -243,7 +264,7 @@ export default function DashboardPage() {
       <header className="flex items-center justify-between">
         <div className="space-y-1">
           <h1 className="text-2xl font-medium leading-tight text-foreground">
-            {user ? `Welcome back, ${user.full_name.split(" ")[0]}` : "Dashboard"}
+            {user ? `Welcome, ${user.email.split("@")[0]}` : "Dashboard"}
           </h1>
           <p className="text-sm leading-relaxed text-muted-foreground">
             {isAdmin

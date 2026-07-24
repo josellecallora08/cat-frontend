@@ -1,10 +1,11 @@
-import type { Metadata } from "next";
-import { Nunito, Geist_Mono } from "next/font/google";
-import "./globals.css";
-import { AppProviders } from "@/components/providers";
-import { AuthGuard } from "@/components/auth-guard";
 import { AppShell } from "@/components/app-shell";
+import { AuthGuard } from "@/components/auth-guard";
 import { DashboardReveal } from "@/components/auth/DashboardReveal";
+import { AppProviders } from "@/components/providers";
+import type { Metadata } from "next";
+import { Geist_Mono, Nunito } from "next/font/google";
+import { Toaster } from "sonner";
+import "./globals.css";
 
 const nunito = Nunito({
   variable: "--font-nunito",
@@ -39,6 +40,11 @@ export default function RootLayout({
             <AppShell>{children}</AppShell>
           </AuthGuard>
           <DashboardReveal />
+          <Toaster
+            richColors
+            position="top-right"
+            toastOptions={{ className: "z-[400]" }}
+          />
         </AppProviders>
       </body>
     </html>

@@ -1,13 +1,11 @@
-import { mockScenarios } from "@/test/mocks/handlers";
 import { server } from "@/test/mocks/server";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import HomePage from "./page";
+import DashboardPage from "./page";
 
-// Mock next/link to render as a simple anchor
+// Mock next/link
 vi.mock("next/link", () => ({
   default: ({
     children,
@@ -23,6 +21,50 @@ vi.mock("next/link", () => ({
     </a>
   ),
 }));
+
+// Mock recharts to avoid rendering issues in jsdom
+vi.mock("recharts", () => ({
+  AreaChart: () => null,
+  Area: () => null,
+  BarChart: () => null,
+  Bar: () => null,
+  XAxis: () => null,
+  YAxis: () => null,
+  CartesianGrid: () => null,
+  Tooltip: () => null,
+  ResponsiveContainer: ({ children }: { children: React.ReactNode }) => children,
+  Legend: () => null,
+  RadarChart: () => null,
+  PolarGrid: () => null,
+  PolarAngleAxis: () => null,
+  PolarRadiusAxis: () => null,
+  Radar: () => null,
+  Cell: () => null,
+}));
+
+const mockDashboardData = {
+  total_sessions: 12,
+  completed_sessions: 8,
+  active_sessions: 2,
+  total_scenarios: 5,
+  average_overall_score: 72,
+  category_averages: [
+    { category: "Call Opening", average_score: 80 },
+    { category: "Compliance", average_score: 75 },
+  ],
+  recent_sessions: [
+    {
+      id: "session-1",
+      scenario_name: "Financial Hardship",
+      persona_name: "Maria Santos",
+      status: "completed",
+      overall_score: 85,
+      created_at: "2024-01-15T10:30:00Z",
+    },
+  ],
+  total_conversations: 45,
+  improvement_trend: 5,
+};
 
 beforeAll(() => server.listen());
 afterEach(() => server.resetHandlers());
@@ -41,112 +83,116 @@ function renderWithProviders(ui: React.ReactElement) {
   );
 }
 
-describe("HomePage - Scenario List", () => {
+describe("DashboardPage", () => {
   it("shows loading skeletons initially", () => {
-    renderWithProviders(<HomePage />);
+    server.use(
+      http.get("/api/dashboard", async () => {
+        await new Promise(() => {/* never resolves */});
+        return HttpResponse.json({});
+      })
+    );
+
+    renderWithProviders(<DashboardPage />);
     const skeletons = document.querySelectorAll(".animate-pulse");
     expect(skeletons.length).toBeGreaterThan(0);
   });
 
-  it("renders scenario cards with name and type", async () => {
-    renderWithProviders(<HomePage />);
-
-    await waitFor(() => {
-      expect(
-        screen.getByRole("heading", { name: "Financial Hardship" })
-      ).toBeInTheDocument();
-    });
-
-    expect(
-      screen.getByRole("heading", { name: "Angry Customer" })
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("heading", { name: "Payment Extension Request" })
-    ).toBeInTheDocument();
-
-    // Scenario type badge labels displayed on cards (title-cased)
-    expect(
-      screen.getAllByText("Payment Extension").length
-    ).toBeGreaterThan(0);
-    expect(screen.getAllByText("Angry Customer").length).toBeGreaterThan(0);
-  });
-
-  it("links each card to the scenario detail page", async () => {
-    renderWithProviders(<HomePage />);
-
-    await waitFor(() => {
-      expect(
-        screen.getByRole("heading", { name: "Financial Hardship" })
-      ).toBeInTheDocument();
-    });
-
-    const links = screen.getAllByRole("link");
-    expect(links[0]).toHaveAttribute(
-      "href",
-      `/scenarios/${mockScenarios[0].id}`
-    );
-    expect(links[1]).toHaveAttribute(
-      "href",
-      `/scenarios/${mockScenarios[1].id}`
-    );
-  });
-
-  it("shows empty state when no scenarios are available", async () => {
+  it("renders dashboard with KPI stats on successful fetch", async () => {
     server.use(
-      http.get("/api/scenarios", () => {
+      http.get("/api/dashboard", () => {
+        return HttpResponse.json(mockDashboardData);
+      }),
+      http.get("/api/dashboard/score-history", () => {
         return HttpResponse.json([]);
       })
     );
 
-    renderWithProviders(<HomePage />);
+    renderWithProviders(<DashboardPage />);
 
     await waitFor(() => {
-      expect(screen.getByText("No scenarios available")).toBeInTheDocument();
+      expect(screen.getByText("12")).toBeInTheDocument();
     });
+
+    expect(screen.getByText("72%")).toBeInTheDocument();
+    expect(screen.getByText("5")).toBeInTheDocument();
+    expect(screen.getByText("45")).toBeInTheDocument();
   });
 
-  it("shows error state with retry button on fetch failure", async () => {
+  it("shows error state when dashboard fetch fails", async () => {
     server.use(
-      http.get("/api/scenarios", () => {
+      http.get("/api/dashboard", () => {
+        return HttpResponse.json(null, { status: 500 });
+      }),
+      http.get("/api/dashboard/score-history", () => {
         return HttpResponse.json(null, { status: 500 });
       })
     );
 
-    renderWithProviders(<HomePage />);
+    renderWithProviders(<DashboardPage />);
 
     await waitFor(() => {
-      expect(screen.getByText(/couldn't load scenarios/i)).toBeInTheDocument();
+      expect(screen.getByText(/couldn't load dashboard/i)).toBeInTheDocument();
     });
-
-    expect(screen.getByRole("button", { name: /try again/i })).toBeInTheDocument();
   });
 
-  it("retries fetching when retry button is clicked", async () => {
-    const user = userEvent.setup();
-    let callCount = 0;
-
+  it("renders recent sessions list", async () => {
     server.use(
-      http.get("/api/scenarios", () => {
-        callCount++;
-        if (callCount === 1) {
-          return HttpResponse.json(null, { status: 500 });
-        }
-        return HttpResponse.json(mockScenarios);
+      http.get("/api/dashboard", () => {
+        return HttpResponse.json(mockDashboardData);
+      }),
+      http.get("/api/dashboard/score-history", () => {
+        return HttpResponse.json([]);
       })
     );
 
-    renderWithProviders(<HomePage />);
+    renderWithProviders(<DashboardPage />);
 
     await waitFor(() => {
-      expect(screen.getByText(/couldn't load scenarios/i)).toBeInTheDocument();
+      expect(screen.getByText("Financial Hardship")).toBeInTheDocument();
     });
 
-    await user.click(screen.getByRole("button", { name: /try again/i }));
+    expect(screen.getByText("85%")).toBeInTheDocument();
+  });
+
+  it("shows empty recent sessions message when none available", async () => {
+    server.use(
+      http.get("/api/dashboard", () => {
+        return HttpResponse.json({
+          ...mockDashboardData,
+          recent_sessions: [],
+        });
+      }),
+      http.get("/api/dashboard/score-history", () => {
+        return HttpResponse.json([]);
+      })
+    );
+
+    renderWithProviders(<DashboardPage />);
 
     await waitFor(() => {
       expect(
-        screen.getByRole("heading", { name: "Financial Hardship" })
+        screen.getByText(/no sessions yet/i)
       ).toBeInTheDocument();
     });
+  });
+
+  it("has a link to start training", async () => {
+    server.use(
+      http.get("/api/dashboard", () => {
+        return HttpResponse.json(mockDashboardData);
+      }),
+      http.get("/api/dashboard/score-history", () => {
+        return HttpResponse.json([]);
+      })
+    );
+
+    renderWithProviders(<DashboardPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Start Training")).toBeInTheDocument();
+    });
+
+    const link = screen.getByRole("link", { name: /start training/i });
+    expect(link).toHaveAttribute("href", "/scenarios");
   });
 });

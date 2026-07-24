@@ -1,38 +1,37 @@
 "use client";
 
-import { useMemo, useState, useEffect, useRef } from "react";
-import Link from "next/link";
-import { useSearchParams, useRouter } from "next/navigation";
-import gsap from "gsap";
-import { useScenarios } from "@/hooks/use-scenarios";
-import { useAuthStore } from "@/stores/auth-store";
-import { useQueryClient, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Select } from "@/components/ui/select";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogFooter,
-  DialogTitle,
-  DialogDescription,
-  DialogClose,
+    Dialog,
+    DialogClose,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
 } from "@/components/ui/dialog";
+import { Select } from "@/components/ui/select";
+import { useScenarios } from "@/hooks/use-scenarios";
 import { cn } from "@/lib/utils";
+import { useAuthStore } from "@/stores/auth-store";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import gsap from "gsap";
 import {
-  HeartCrack,
-  Flame,
-  CalendarClock,
-  Scale,
-  Inbox,
-  AlertCircle,
-  ArrowRight,
-  Sparkles,
-  Loader2,
-  Trash2,
-  type LucideIcon,
+    AlertCircle,
+    ArrowRight,
+    CalendarClock,
+    Flame,
+    HeartCrack,
+    Inbox,
+    Loader2,
+    Scale,
+    Sparkles,
+    Trash2,
+    type LucideIcon,
 } from "lucide-react";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
 
@@ -100,6 +99,7 @@ export default function ScenariosPage() {
   const user = useAuthStore((s) => s.user);
   const token = useAuthStore((s) => s.token) ?? "";
   const isAdmin = user?.role === "admin";
+  const isAgent = user?.user_type === "agent";
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -368,8 +368,12 @@ export default function ScenariosPage() {
             {activeFilter === "ALL"
               ? isAdmin
                 ? "Generate your first scenario using AI."
-                : "Scenarios are added by your administrator. Check back soon."
-              : "Try a different category or view all scenarios."}
+                : isAgent
+                  ? "You'll see scenarios here once you're assigned to an active campaign. Contact your administrator for access."
+                  : "Scenarios are added by your administrator. Check back soon."
+              : isAgent
+                ? "Try a different category or reset to view all your available scenarios."
+                : "Try a different category or view all scenarios."}
           </p>
           {activeFilter !== "ALL" && (
             <Button

@@ -11,6 +11,8 @@ export const authMessages: Record<AuthErrorCode, string> = {
   EMAIL_ALREADY_USED: "This email is already used. Try logging in instead.",
   RESET_LINK_EXPIRED: "This reset link has expired. Send a new reset link.",
   SESSION_EXPIRED: "Your session expired. Please log in again.",
+  LARK_AUTH_FAILED: "Lark authentication failed. Please try again.",
+  LARK_NOT_CONFIGURED: "Lark sign-in is not available right now. Please try again later.",
 };
 
 export const authButtonLabels = {

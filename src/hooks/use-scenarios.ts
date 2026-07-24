@@ -1,10 +1,14 @@
 import { useQuery } from "@tanstack/react-query";
-import { fetchScenarios, fetchScenarioById } from "@/lib/api/scenarios";
+
+import { fetchScenarioById, fetchScenarios } from "@/lib/api/scenarios";
+import { useAuthStore } from "@/stores/auth-store";
 
 export function useScenarios() {
+  const token = useAuthStore((s) => s.token);
+
   return useQuery({
-    queryKey: ["scenarios"],
-    queryFn: fetchScenarios,
+    queryKey: ["scenarios", token ? "authenticated" : "public"],
+    queryFn: () => fetchScenarios(token ?? undefined),
   });
 }
 

@@ -1,12 +1,12 @@
 "use client";
 
-import { useRef, useCallback } from "react";
-import type { AuthStatus, AuthFieldErrors } from "@/lib/auth/types";
+import type { AuthFieldErrors, AuthStatus } from "@/lib/auth/types";
+import { useCallback, useRef } from "react";
 import { AuthInput } from "./AuthInput";
+import { AuthSwitchLink } from "./AuthSwitchLink";
 import { PasswordInput } from "./PasswordInput";
 import { PrimaryAuthButton } from "./PrimaryAuthButton";
 import { SocialAuthButtons } from "./SocialAuthButtons";
-import { AuthSwitchLink } from "./AuthSwitchLink";
 
 interface LoginFormProps {
   status: AuthStatus;
@@ -16,7 +16,6 @@ interface LoginFormProps {
   onSubmit: (email: string, password: string) => void;
   onForgotPassword: () => void;
   onSignup: () => void;
-  onGoogle: () => void;
   onLark: () => void;
   onFieldChange: () => void;
   onBackToRoles?: () => void;
@@ -28,9 +27,8 @@ export function LoginForm({
   buttonMessage,
   role,
   onSubmit,
-  onForgotPassword,
+  onForgotPassword: _onForgotPassword,
   onSignup,
-  onGoogle,
   onLark,
   onFieldChange,
   onBackToRoles,
@@ -121,7 +119,6 @@ export function LoginForm({
       </form>
 
       <SocialAuthButtons
-        onGoogle={onGoogle}
         onLark={onLark}
         disabled={isSubmitting}
       />
