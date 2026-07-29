@@ -5,7 +5,7 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-nunito), "Nunito", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "SF Pro Rounded", "SF Compact Rounded", ui-rounded, var(--font-nunito), "Nunito", system-ui, -apple-system, sans-serif;
   --font-mono: var(--font-geist-mono);
   --font-heading: var(--font-sans);
   --color-sidebar-ring: var(--sidebar-ring);

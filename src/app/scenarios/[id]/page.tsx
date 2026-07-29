@@ -7,6 +7,8 @@ import { useScenario } from "@/hooks/use-scenarios";
 import { ScenarioIncompleteProfileError } from "@/lib/api/scenarios";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { ScenarioScriptDialog } from "@/components/admin/scenario-script-dialog";
+import { useAuthStore } from "@/stores/auth-store";
 import { Badge } from "@/components/ui/badge";
 import {
   HeartCrack,
@@ -104,6 +106,7 @@ export default function ScenarioDetailPage({
   const searchParams = useSearchParams();
   const { data: scenario, isLoading, isError, error } = useScenario(id);
   const [starting, setStarting] = useState(false);
+  const user = useAuthStore((state) => state.user);
 
   // Build back URL preserving the filter param
   const filter = searchParams.get("filter");
@@ -214,7 +217,7 @@ export default function ScenarioDetailPage({
                 </div>
                 <div className="py-3 last:pb-0">
                   <dt className="text-sm text-muted-foreground">
-                    Conversation goal
+                    Debtor&apos;s objective
                   </dt>
                   <dd className="mt-1 text-sm leading-relaxed text-foreground">
                     {debtor_profile.conversation_goal}
@@ -265,6 +268,12 @@ export default function ScenarioDetailPage({
                     </>
                   )}
                 </Button>
+                {user?.role === "admin" && (
+                  <ScenarioScriptDialog
+                    scenarioId={scenario.id}
+                    scenarioName={scenario.name}
+                  />
+                )}
                 <Link href={backHref} className="mt-2 block">
                   <Button variant="outline" size="lg" className="w-full" disabled={starting}>
                     Back to scenarios

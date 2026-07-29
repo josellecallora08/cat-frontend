@@ -5,7 +5,7 @@ import { useScroll } from "@/hooks/use-scroll";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth-store";
 import gsap from "gsap";
-import { LayoutGrid, LogOut, Megaphone, Mic, Settings, TrendingUp, User, Users, UsersRound } from "lucide-react";
+import { FileCode2, LayoutGrid, LogOut, Megaphone, Mic, Settings, TrendingUp, User, Users, UsersRound } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 
@@ -250,6 +250,15 @@ export function NavigationShell({ children }: { children: React.ReactNode }) {
 
                   {/* Menu items */}
                   <div className="py-1">
+                    {isAdmin && (
+                      <button
+                        onClick={() => { setProfileOpen(false); navigate("/admin/scripts"); }}
+                        className="flex w-full items-center gap-3 px-4 py-2 text-sm text-[#2B2339] hover:bg-[#F3F3F3] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#8F6AE0]"
+                      >
+                        <FileCode2 className="h-4 w-4 text-[#2B2339]/60" aria-hidden="true" />
+                        Scripts
+                      </button>
+                    )}
                     <button
                       onClick={() => { setProfileOpen(false); }}
                       className="flex w-full items-center gap-3 px-4 py-2 text-sm text-[#2B2339] hover:bg-[#F3F3F3] transition-colors"
