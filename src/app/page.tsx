@@ -2,8 +2,10 @@
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { getDashboardVariant, useDashboard, useLeaderboard, useScoreHistory } from "@/hooks/use-dashboard";
+import type { AgentRanking } from "@/lib/api/dashboard";
+import { isNoCampaignState } from "@/lib/api/dashboard";
 import { useAuthStore } from "@/stores/auth-store";
-import { useQuery } from "@tanstack/react-query";
 import {
     AlertCircle,
     LayoutGrid,
@@ -13,6 +15,7 @@ import {
     Target,
     TrendingUp,
     Trophy,
+    Users,
 } from "lucide-react";
 import Link from "next/link";
 import {
@@ -33,98 +36,6 @@ import {
     XAxis,
     YAxis,
 } from "recharts";
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
-
-// --- Types ---
-
-interface CategoryAverage {
-  category: string;
-  average_score: number;
-}
-
-interface RecentSession {
-  id: string;
-  scenario_name: string;
-  persona_name: string;
-  status: string;
-  overall_score: number | null;
-  created_at: string;
-}
-
-interface DashboardData {
-  total_sessions: number;
-  completed_sessions: number;
-  active_sessions: number;
-  total_scenarios: number;
-  average_overall_score: number | null;
-  category_averages: CategoryAverage[];
-  recent_sessions: RecentSession[];
-  total_conversations: number;
-  improvement_trend: number | null;
-}
-
-interface ScoreDataPoint {
-  session_number: number;
-  overall_score: number;
-  call_opening: number | null;
-  compliance: number | null;
-  empathy_communication: number | null;
-  negotiation_resolution: number | null;
-  date: string;
-}
-
-interface AgentRanking {
-  rank: number;
-  agent_id: string;
-  agent_name: string;
-  sessions_completed: number;
-  average_score: number;
-  best_score: number;
-  improvement: number | null;
-}
-
-// --- API ---
-
-async function fetchDashboard(
-  agentId?: string,
-  token?: string
-): Promise<DashboardData> {
-  const params = agentId ? `?agent_id=${agentId}` : "";
-  const headers: Record<string, string> = {};
-  if (token) {
-    headers["Authorization"] = `Bearer ${token}`;
-  }
-  const res = await fetch(
-    `${API_BASE_URL}/api/dashboard${params}`,
-    { headers }
-  );
-  if (!res.ok) throw new Error("Failed to fetch dashboard");
-  return res.json();
-}
-
-async function fetchScoreHistory(
-  agentId?: string,
-  token?: string
-): Promise<ScoreDataPoint[]> {
-  const params = agentId ? `?agent_id=${agentId}` : "";
-  const headers: Record<string, string> = {};
-  if (token) {
-    headers["Authorization"] = `Bearer ${token}`;
-  }
-  const res = await fetch(
-    `${API_BASE_URL}/api/dashboard/score-history${params}`,
-    { headers }
-  );
-  if (!res.ok) return [];
-  return res.json();
-}
-
-async function fetchLeaderboard(): Promise<AgentRanking[]> {
-  const res = await fetch(`${API_BASE_URL}/api/dashboard/leaderboard`);
-  if (!res.ok) return [];
-  return res.json();
-}
 
 // --- Components ---
 
@@ -155,6 +66,23 @@ function StatCard({
   );
 }
 
+function NoCampaignState() {
+  return (
+    <div className="flex flex-col items-center rounded-lg border border-border bg-card px-6 py-12 text-center">
+      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+        <Users className="h-6 w-6 text-muted-foreground" aria-hidden="true" />
+      </div>
+      <h2 className="mt-4 text-base font-medium text-foreground">
+        No campaign assigned
+      </h2>
+      <p className="mt-1 max-w-sm text-sm text-muted-foreground">
+        You are not currently assigned to any active campaign. Contact your
+        administrator to get assigned to a campaign.
+      </p>
+    </div>
+  );
+}
+
 function formatDate(dateStr: string): string {
   return new Date(dateStr).toLocaleString("en-PH", {
     dateStyle: "short",
@@ -179,31 +107,83 @@ function getRankBadge(rank: number) {
   return `#${rank}`;
 }
 
+function LeaderboardTable({ leaderboard }: { leaderboard: AgentRanking[] }) {
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b border-border text-left">
+            <th className="pb-3 pr-4 text-xs font-medium text-muted-foreground w-12">Rank</th>
+            <th className="pb-3 pr-4 text-xs font-medium text-muted-foreground">Agent</th>
+            <th className="pb-3 pr-4 text-xs font-medium text-muted-foreground text-center">Sessions</th>
+            <th className="pb-3 pr-4 text-xs font-medium text-muted-foreground text-center">Avg Score</th>
+            <th className="pb-3 pr-4 text-xs font-medium text-muted-foreground text-center">Best</th>
+            <th className="pb-3 text-xs font-medium text-muted-foreground text-center">Trend</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-border">
+          {leaderboard.map((agent) => (
+            <tr key={agent.agent_id}>
+              <td className="py-3 pr-4">
+                <span className="text-base">{getRankBadge(agent.rank)}</span>
+              </td>
+              <td className="py-3 pr-4">
+                <div className="flex items-center gap-2">
+                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-secondary text-xs font-medium text-secondary-foreground">
+                    {agent.agent_name.charAt(0).toUpperCase()}
+                  </div>
+                  <span className="text-sm font-medium text-foreground">
+                    {agent.agent_name}
+                  </span>
+                </div>
+              </td>
+              <td className="py-3 pr-4 text-center text-sm text-muted-foreground">
+                {agent.sessions_completed}
+              </td>
+              <td className="py-3 pr-4 text-center">
+                <span className="text-sm font-medium text-foreground">
+                  {agent.average_score}%
+                </span>
+              </td>
+              <td className="py-3 pr-4 text-center text-sm text-muted-foreground">
+                {agent.best_score}%
+              </td>
+              <td className="py-3 text-center">
+                {agent.improvement !== null ? (
+                  <span
+                    className={`text-xs font-medium ${
+                      agent.improvement > 0
+                        ? "text-success-foreground"
+                        : agent.improvement < 0
+                        ? "text-destructive"
+                        : "text-muted-foreground"
+                    }`}
+                  >
+                    {agent.improvement > 0 ? "↑" : agent.improvement < 0 ? "↓" : "→"}{" "}
+                    {Math.abs(agent.improvement)}
+                  </span>
+                ) : (
+                  <span className="text-xs text-muted-foreground">—</span>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 // --- Page ---
 
 export default function DashboardPage() {
   const user = useAuthStore((s) => s.user);
-  const token = useAuthStore((s) => s.token);
-  const isAdmin = user?.role === "admin";
-  // Agents only see their own data; admins see everything
-  const agentFilter = !isAdmin && user?.id ? user.id : undefined;
+  const variant = getDashboardVariant(user);
+  const showLeaderboard = variant === "admin" || variant === "trainer";
 
-  const { data, isLoading, isError } = useQuery({
-    queryKey: ["dashboard", agentFilter],
-    queryFn: () => fetchDashboard(agentFilter, token ?? undefined),
-    refetchInterval: 30000,
-  });
-
-  const { data: scoreHistory } = useQuery({
-    queryKey: ["score-history", agentFilter],
-    queryFn: () => fetchScoreHistory(agentFilter, token ?? undefined),
-  });
-
-  const { data: leaderboard } = useQuery({
-    queryKey: ["leaderboard"],
-    queryFn: fetchLeaderboard,
-    enabled: isAdmin,
-  });
+  const { data, isLoading, isError } = useDashboard();
+  const { data: scoreHistory } = useScoreHistory();
+  const { data: leaderboard } = useLeaderboard();
 
   if (isLoading) {
     return (
@@ -243,6 +223,23 @@ export default function DashboardPage() {
     );
   }
 
+  // Empty state for trainers with no campaign assignment
+  if (isNoCampaignState(data, variant)) {
+    return (
+      <div className="space-y-6">
+        <header className="space-y-1">
+          <h1 className="text-2xl font-medium leading-tight text-foreground">
+            {user ? `Welcome, ${user.email.split("@")[0]}` : "Dashboard"}
+          </h1>
+          <p className="text-sm leading-relaxed text-muted-foreground">
+            Campaign performance overview for all agents.
+          </p>
+        </header>
+        <NoCampaignState />
+      </div>
+    );
+  }
+
   // Radar chart data
   const radarData = data.category_averages.map((cat) => ({
     category: cat.category.replace("&", "\n&"),
@@ -263,13 +260,22 @@ export default function DashboardPage() {
       {/* Header */}
       <header className="flex items-center justify-between">
         <div className="space-y-1">
-          <h1 className="text-2xl font-medium leading-tight text-foreground">
-            {user ? `Welcome, ${user.email.split("@")[0]}` : "Dashboard"}
-          </h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-medium leading-tight text-foreground">
+              {user ? `Welcome, ${user.email.split("@")[0]}` : "Dashboard"}
+            </h1>
+            {data.campaign_name && (variant === "trainer" || variant === "agent") && (
+              <span className="inline-flex items-center rounded-md bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
+                {data.campaign_name}
+              </span>
+            )}
+          </div>
           <p className="text-sm leading-relaxed text-muted-foreground">
-            {isAdmin
+            {variant === "admin"
               ? "Training platform overview and performance metrics."
-              : "Your personal training progress and performance."}
+              : variant === "trainer"
+                ? "Campaign performance overview for all agents."
+                : "Your personal training progress and performance."}
           </p>
         </div>
         <Link href="/scenarios">
@@ -430,8 +436,8 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      {/* Agent Ranking Bar Chart — admin only */}
-      {isAdmin && (
+      {/* Agent Ranking Bar Chart — admin and trainer */}
+      {showLeaderboard && (
         <Card>
           <CardHeader>
             <div className="flex items-center gap-2">
@@ -498,8 +504,8 @@ export default function DashboardPage() {
         </Card>
       )}
 
-      {/* Agent Leaderboard Table — admin only */}
-      {isAdmin && leaderboard && leaderboard.length > 0 && (
+      {/* Agent Leaderboard Table — admin and trainer */}
+      {showLeaderboard && leaderboard && leaderboard.length > 0 && (
         <Card>
           <CardHeader>
             <div className="flex items-center gap-2">
@@ -510,68 +516,7 @@ export default function DashboardPage() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-border text-left">
-                    <th className="pb-3 pr-4 text-xs font-medium text-muted-foreground w-12">Rank</th>
-                    <th className="pb-3 pr-4 text-xs font-medium text-muted-foreground">Agent</th>
-                    <th className="pb-3 pr-4 text-xs font-medium text-muted-foreground text-center">Sessions</th>
-                    <th className="pb-3 pr-4 text-xs font-medium text-muted-foreground text-center">Avg Score</th>
-                    <th className="pb-3 pr-4 text-xs font-medium text-muted-foreground text-center">Best</th>
-                    <th className="pb-3 text-xs font-medium text-muted-foreground text-center">Trend</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {leaderboard.map((agent) => (
-                    <tr key={agent.agent_id}>
-                      <td className="py-3 pr-4">
-                        <span className="text-base">{getRankBadge(agent.rank)}</span>
-                      </td>
-                      <td className="py-3 pr-4">
-                        <div className="flex items-center gap-2">
-                          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-secondary text-xs font-medium text-secondary-foreground">
-                            {agent.agent_name.charAt(0).toUpperCase()}
-                          </div>
-                          <span className="text-sm font-medium text-foreground">
-                            {agent.agent_name}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="py-3 pr-4 text-center text-sm text-muted-foreground">
-                        {agent.sessions_completed}
-                      </td>
-                      <td className="py-3 pr-4 text-center">
-                        <span className="text-sm font-medium text-foreground">
-                          {agent.average_score}%
-                        </span>
-                      </td>
-                      <td className="py-3 pr-4 text-center text-sm text-muted-foreground">
-                        {agent.best_score}%
-                      </td>
-                      <td className="py-3 text-center">
-                        {agent.improvement !== null ? (
-                          <span
-                            className={`text-xs font-medium ${
-                              agent.improvement > 0
-                                ? "text-success-foreground"
-                                : agent.improvement < 0
-                                ? "text-destructive"
-                                : "text-muted-foreground"
-                            }`}
-                          >
-                            {agent.improvement > 0 ? "↑" : agent.improvement < 0 ? "↓" : "→"}{" "}
-                            {Math.abs(agent.improvement)}
-                          </span>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">—</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <LeaderboardTable leaderboard={leaderboard} />
           </CardContent>
         </Card>
       )}

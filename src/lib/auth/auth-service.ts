@@ -16,6 +16,7 @@ export interface AuthResult {
       role: "admin" | "user";
       user_type: "trainer" | "agent" | null;
       is_active: boolean;
+      avatar_url: string | null;
     };
   };
 }

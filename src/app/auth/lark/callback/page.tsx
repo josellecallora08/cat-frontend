@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useRef, Suspense } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useRef } from "react";
 
 import { toast } from "sonner";
 
 import { authService } from "@/lib/auth/auth-service";
 import { authMessages } from "@/lib/auth/messages";
+import { setCookie } from "@/lib/cookies";
 import { useAuthStore } from "@/stores/auth-store";
 
 function LarkCallbackHandler() {
@@ -29,12 +30,23 @@ function LarkCallbackHandler() {
 
     authService.completeLarkOAuth(code, state).then((result) => {
       if (result.success && result.data) {
-        localStorage.setItem("cat_token", result.data.access_token);
-        localStorage.setItem("cat_user", JSON.stringify(result.data.user));
-        useAuthStore.setState({
-          user: result.data.user,
-          token: result.data.access_token,
+        const { access_token, user } = result.data;
+
+        localStorage.setItem("cat_token", access_token);
+        localStorage.setItem("cat_user", JSON.stringify(user));
+
+        setCookie("cat_token", access_token, {
+          path: "/",
+          sameSite: "Lax",
+          maxAge: 86400,
         });
+        setCookie("cat_user", JSON.stringify(user), {
+          path: "/",
+          sameSite: "Lax",
+          maxAge: 86400,
+        });
+
+        useAuthStore.setState({ user, token: access_token });
         toast.success("Logged in successfully");
         router.replace("/");
       } else {

@@ -1,23 +1,23 @@
 "use client";
 
-import { useRef, useEffect, useState } from "react";
-import Link from "next/link";
-import { useQuery, keepPreviousData } from "@tanstack/react-query";
-import gsap from "gsap";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { Select } from "@/components/ui/select";
-import { useAuthStore } from "@/stores/auth-store";
 import { cn } from "@/lib/utils";
+import { useAuthStore } from "@/stores/auth-store";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import gsap from "gsap";
 import {
-  Mic,
-  ArrowRight,
-  Loader2,
-  ChevronLeft,
-  ChevronRight,
-  ArrowUpDown,
+    ArrowRight,
+    ArrowUpDown,
+    ChevronLeft,
+    ChevronRight,
+    Loader2,
+    Mic,
 } from "lucide-react";
+import Link from "next/link";
+import { useEffect, useRef, useState } from "react";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
 const PAGE_SIZE = 8;
@@ -67,6 +67,7 @@ async function fetchSessions(params: {
   status: string;
   sortBy: SortBy;
   sortDir: SortDir;
+  token?: string;
 }): Promise<PaginatedSessions> {
   const qs = new URLSearchParams({
     page: String(params.page),
@@ -77,7 +78,14 @@ async function fetchSessions(params: {
   if (params.agentId) qs.set("agent_id", params.agentId);
   if (params.status !== "ALL") qs.set("status", params.status);
 
-  const res = await fetch(`${API_BASE_URL}/api/dashboard/sessions?${qs}`);
+  const headers: Record<string, string> = {};
+  if (params.token) {
+    headers["Authorization"] = `Bearer ${params.token}`;
+  }
+
+  const res = await fetch(`${API_BASE_URL}/api/dashboard/sessions?${qs}`, {
+    headers,
+  });
   if (!res.ok) throw new Error("Failed to load sessions");
   return res.json();
 }
@@ -107,8 +115,11 @@ function StatusBadge({ status }: { status: string }) {
 
 export default function SessionsPage() {
   const user = useAuthStore((s) => s.user);
+  const token = useAuthStore((s) => s.token);
   const isAdmin = user?.role === "admin";
-  const agentFilter = !isAdmin && user?.id ? user.id : undefined;
+  const isTrainer = user?.role === "user" && user?.user_type === "trainer";
+  // Agents filter by their own ID; admins and trainers rely on backend scoping
+  const agentFilter = !isAdmin && !isTrainer && user?.id ? user.id : undefined;
 
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState("ALL");
@@ -118,7 +129,14 @@ export default function SessionsPage() {
   const { data, isLoading, isFetching, isError, refetch } = useQuery({
     queryKey: ["sessions", agentFilter, page, status, sortBy, sortDir],
     queryFn: () =>
-      fetchSessions({ page, agentId: agentFilter, status, sortBy, sortDir }),
+      fetchSessions({
+        page,
+        agentId: agentFilter,
+        status,
+        sortBy,
+        sortDir,
+        token: token ?? undefined,
+      }),
     placeholderData: keepPreviousData,
   });
 
@@ -217,7 +235,9 @@ export default function SessionsPage() {
             Sessions
           </h1>
           <p className="text-sm leading-relaxed text-muted-foreground">
-            {isAdmin ? "All training sessions." : "Your training session history."}
+            {isAdmin || isTrainer
+              ? "All training sessions."
+              : "Your training session history."}
           </p>
         </div>
 
@@ -348,7 +368,7 @@ export default function SessionsPage() {
                       </div>
                       <p className="text-xs text-muted-foreground">
                         {session.persona_name} · {formatDate(session.created_at)}
-                        {isAdmin && ` · ${session.agent_name}`}
+                        {(isAdmin || isTrainer) && ` · ${session.agent_name}`}
                       </p>
                     </div>
                     {session.status === "completed" && (
