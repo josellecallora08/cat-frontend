@@ -1,5 +1,7 @@
 import { create } from "zustand";
 
+import { removeCookie, setCookie } from "@/lib/cookies";
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
 
 export type UserRole = "admin" | "user";
@@ -12,6 +14,7 @@ export interface AuthUser {
   role: UserRole;
   user_type: UserType | null;
   is_active: boolean;
+  avatar_url: string | null;
 }
 
 export interface AuthState {
@@ -60,6 +63,17 @@ export const useAuthStore = create<AuthStore>((set) => ({
       localStorage.setItem("cat_token", access_token);
       localStorage.setItem("cat_user", JSON.stringify(user));
 
+      setCookie("cat_token", access_token, {
+        path: "/",
+        sameSite: "Lax",
+        maxAge: 86400,
+      });
+      setCookie("cat_user", JSON.stringify(user), {
+        path: "/",
+        sameSite: "Lax",
+        maxAge: 86400,
+      });
+
       set({ user, token: access_token, isLoading: false });
     } catch (err) {
       const message = err instanceof Error ? err.message : "Login failed";
@@ -87,6 +101,17 @@ export const useAuthStore = create<AuthStore>((set) => ({
       localStorage.setItem("cat_token", access_token);
       localStorage.setItem("cat_user", JSON.stringify(user));
 
+      setCookie("cat_token", access_token, {
+        path: "/",
+        sameSite: "Lax",
+        maxAge: 86400,
+      });
+      setCookie("cat_user", JSON.stringify(user), {
+        path: "/",
+        sameSite: "Lax",
+        maxAge: 86400,
+      });
+
       set({ user, token: access_token, isLoading: false });
     } catch (err) {
       const message = err instanceof Error ? err.message : "Registration failed";
@@ -97,6 +122,8 @@ export const useAuthStore = create<AuthStore>((set) => ({
   logout: () => {
     localStorage.removeItem("cat_token");
     localStorage.removeItem("cat_user");
+    removeCookie("cat_token");
+    removeCookie("cat_user");
     set(initialState);
   },
 
@@ -106,6 +133,16 @@ export const useAuthStore = create<AuthStore>((set) => ({
     if (token && userStr) {
       try {
         const user = JSON.parse(userStr) as AuthUser;
+        setCookie("cat_token", token, {
+          path: "/",
+          sameSite: "Lax",
+          maxAge: 86400,
+        });
+        setCookie("cat_user", userStr, {
+          path: "/",
+          sameSite: "Lax",
+          maxAge: 86400,
+        });
         set({ user, token });
       } catch {
         localStorage.removeItem("cat_token");

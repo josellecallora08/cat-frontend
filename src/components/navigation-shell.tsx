@@ -1,6 +1,8 @@
 "use client";
 
+import { AvatarDisplay } from "@/components/avatar-display";
 import GradualBlur from "@/components/react-bits/GradualBlur";
+import { useRealtimeEvents } from "@/hooks/use-realtime-events";
 import { useScroll } from "@/hooks/use-scroll";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth-store";
@@ -36,6 +38,9 @@ export function NavigationShell({ children }: { children: React.ReactNode }) {
 
   // Scroll-aware: header floats into a compact pill when the page is scrolled.
   const scrolled = useScroll(12);
+
+  // Establish real-time WebSocket connection for event broadcasting
+  useRealtimeEvents();
 
   const prefersReduced =
     typeof window !== "undefined" &&
@@ -133,6 +138,7 @@ export function NavigationShell({ children }: { children: React.ReactNode }) {
   );
 
   const initial = user?.full_name?.charAt(0)?.toUpperCase() ?? "U";
+  const avatarUrl = user?.avatar_url ?? null;
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
@@ -234,7 +240,16 @@ export function NavigationShell({ children }: { children: React.ReactNode }) {
                   aria-expanded={profileOpen}
                   className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full border-2 border-[#2B2339] text-sm font-bold text-[#2B2339] transition-colors hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                 >
-                  {initial}
+                  {avatarUrl ? (
+                    <AvatarDisplay
+                      fullName={user?.full_name ?? ""}
+                      avatarUrl={avatarUrl}
+                      size={30}
+                      className="h-[30px] w-[30px]"
+                    />
+                  ) : (
+                    initial
+                  )}
                 </button>
               </div>
 
@@ -251,7 +266,7 @@ export function NavigationShell({ children }: { children: React.ReactNode }) {
                   {/* Menu items */}
                   <div className="py-1">
                     <button
-                      onClick={() => { setProfileOpen(false); }}
+                      onClick={() => { setProfileOpen(false); router.push("/profile"); }}
                       className="flex w-full items-center gap-3 px-4 py-2 text-sm text-[#2B2339] hover:bg-[#F3F3F3] transition-colors"
                     >
                       <User className="h-4 w-4 text-[#2B2339]/60" />

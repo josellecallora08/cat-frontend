@@ -4,6 +4,7 @@ import { authService } from "@/lib/auth/auth-service";
 import { authMessages } from "@/lib/auth/messages";
 import type { AuthFieldErrors, AuthStatus, AuthView } from "@/lib/auth/types";
 import { validateLogin, validateReset, validateSignup } from "@/lib/auth/validation";
+import { setCookie } from "@/lib/cookies";
 import { useAuthStore } from "@/stores/auth-store";
 import gsap from "gsap";
 import { useRouter } from "next/navigation";
@@ -118,12 +119,23 @@ export function AuthShell() {
 
       // Store auth data
       if (result.data) {
-        localStorage.setItem("cat_token", result.data.access_token);
-        localStorage.setItem("cat_user", JSON.stringify(result.data.user));
-        useAuthStore.setState({
-          user: result.data.user,
-          token: result.data.access_token,
+        const { access_token, user } = result.data;
+
+        localStorage.setItem("cat_token", access_token);
+        localStorage.setItem("cat_user", JSON.stringify(user));
+
+        setCookie("cat_token", access_token, {
+          path: "/",
+          sameSite: "Lax",
+          maxAge: 86400,
         });
+        setCookie("cat_user", JSON.stringify(user), {
+          path: "/",
+          sameSite: "Lax",
+          maxAge: 86400,
+        });
+
+        useAuthStore.setState({ user, token: access_token });
       }
 
       setStatus("success");
