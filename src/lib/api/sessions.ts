@@ -83,7 +83,12 @@ export async function createSession(scenarioId: string): Promise<SessionResponse
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to create session: ${response.status}`);
+    const body = await response.json().catch(() => ({}));
+    const detail =
+      typeof body.detail === "string"
+        ? body.detail
+        : body.detail?.message ?? body.message;
+    throw new Error(detail || `Failed to create session: ${response.status}`);
   }
 
   return response.json();

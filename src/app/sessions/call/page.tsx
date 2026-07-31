@@ -307,6 +307,7 @@ function CallPageContent() {
 
   // Auto-start listening when call begins (first time only)
   const hasStartedListening = useRef(false);
+  const pageRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (status === "active" && !hasStartedListening.current) {
       hasStartedListening.current = true;
@@ -333,6 +334,15 @@ function CallPageContent() {
     setTimeout(() => router.push(`/sessions/${sessionId}/results`), 1200);
   }, [sessionId, router]);
 
+  useEffect(() => {
+    if (!pageRef.current) return;
+    gsap.fromTo(
+      pageRef.current,
+      { opacity: 0 },
+      { opacity: 1, duration: 0.5, ease: "power2.out" }
+    );
+  }, []);
+
   if (!sessionId) {
     return (
       <div
@@ -357,16 +367,6 @@ function CallPageContent() {
   const { label, dot, pulse } = statusConfig[status];
 
   // GSAP entrance — fades in smoothly from the dark ringing screen
-  const pageRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!pageRef.current) return;
-    gsap.fromTo(
-      pageRef.current,
-      { opacity: 0 },
-      { opacity: 1, duration: 0.5, ease: "power2.out" }
-    );
-  }, []);
-
   return (
     <div
       ref={pageRef}
@@ -391,10 +391,10 @@ function CallPageContent() {
             <div className="rounded-xl border border-primary/20 bg-primary/5 p-3.5">
               <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-primary">
                 <Target className="h-3.5 w-3.5" aria-hidden="true" />
-                Your goal
+                Your objective as the agent
               </p>
               <p className="mt-1.5 text-sm font-medium leading-relaxed text-foreground">
-                {scenario.debtor_profile.conversation_goal}
+                {scenario.description}
               </p>
             </div>
 
@@ -699,10 +699,10 @@ function CallPageContent() {
               <div className="rounded-xl border border-primary/20 bg-primary/5 p-3.5">
                 <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-primary">
                   <Target className="h-3.5 w-3.5" aria-hidden="true" />
-                  Your goal
+                  Your objective as the agent
                 </p>
                 <p className="mt-1.5 text-sm font-medium leading-relaxed text-foreground">
-                  {scenario.debtor_profile.conversation_goal}
+                  {scenario.description}
                 </p>
               </div>
 

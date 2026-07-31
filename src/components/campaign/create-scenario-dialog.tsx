@@ -352,10 +352,10 @@ function CreateScenarioForm({
             />
           </div>
 
-          {/* Conversational Goal */}
+          {/* Debtor objective */}
           <div className="mt-4">
             <label className="text-sm font-medium text-foreground">
-              Conversational Goal
+              Debtor&apos;s objective
             </label>
             <textarea
               value={formData.conversationalGoal}
