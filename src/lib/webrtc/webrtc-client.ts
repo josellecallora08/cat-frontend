@@ -8,6 +8,8 @@
  * - Connection state events
  */
 
+import { getWsBaseUrl } from "@/lib/websocket-url";
+
 export type WebRTCStatus = "connecting" | "active" | "ended" | "error";
 export type StatusListener = (status: WebRTCStatus, error?: string) => void;
 
@@ -28,13 +30,14 @@ export class WebRTCClient {
   private localStream: MediaStream | null = null;
   private statusListener: StatusListener | null = null;
   private sessionId: string;
+  private token: string;
   private wsUrl: string;
 
-  constructor(sessionId: string) {
+  constructor(sessionId: string, token: string) {
     this.sessionId = sessionId;
-    const host = typeof window !== "undefined" ? window.location.host : "localhost:8000";
-    const protocol = typeof window !== "undefined" && window.location.protocol === "https:" ? "wss:" : "ws:";
-    this.wsUrl = `${protocol}//${host}/ws/voice/${sessionId}`;
+    this.token = token;
+    const baseUrl = getWsBaseUrl();
+    this.wsUrl = `${baseUrl}/ws/voice/${sessionId}?token=${encodeURIComponent(token)}`;
   }
 
   /**

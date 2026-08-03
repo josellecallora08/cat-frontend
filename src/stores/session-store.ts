@@ -1,9 +1,9 @@
-import { create } from "zustand";
 import {
-  createSession as apiCreateSession,
-  endSession as apiEndSession,
-  type SessionResponse,
+    createSession as apiCreateSession,
+    endSession as apiEndSession,
+    type SessionResponse,
 } from "@/lib/api/sessions";
+import { create } from "zustand";
 
 export type SessionStoreStatus =
   | "idle"
@@ -23,7 +23,7 @@ export interface SessionState {
 }
 
 export interface SessionActions {
-  createSession: (scenarioId: string) => Promise<void>;
+  createSession: (scenarioId: string, campaignId?: string) => Promise<void>;
   endSession: () => Promise<void>;
   setStatus: (status: SessionStoreStatus) => void;
   setError: (error: string | null) => void;
@@ -43,11 +43,11 @@ const initialState: SessionState = {
 export const useSessionStore = create<SessionStore>((set, get) => ({
   ...initialState,
 
-  createSession: async (scenarioId: string) => {
+  createSession: async (scenarioId: string, campaignId?: string) => {
     set({ status: "creating", scenarioId, error: null });
 
     try {
-      const session = await apiCreateSession(scenarioId);
+      const session = await apiCreateSession(scenarioId, campaignId);
 
       // Track session in localStorage for history page
       const stored = localStorage.getItem("cat_sessions");
