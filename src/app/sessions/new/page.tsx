@@ -1,18 +1,18 @@
 "use client";
 
-import React, {
-  Suspense,
-  useEffect,
-  useRef,
-  useState,
-  useCallback,
-} from "react";
-import { useSearchParams, useRouter } from "next/navigation";
-import { useSessionStore } from "@/stores/session-store";
-import { Button } from "@/components/ui/button";
-import { AlertCircle, PhoneOff, Mic, Phone } from "lucide-react";
-import gsap from "gsap";
 import { Portal } from "@/components/portal";
+import { Button } from "@/components/ui/button";
+import { useSessionStore } from "@/stores/session-store";
+import gsap from "gsap";
+import { AlertCircle, Mic, Phone, PhoneOff } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
+import React, {
+    Suspense,
+    useCallback,
+    useEffect,
+    useRef,
+    useState,
+} from "react";
 
 // ---------------------------------------------------------------------------
 // Proper telephone ring tone (PH/EU standard: 400Hz, 0.4s+0.4s on, 2s off)
@@ -456,6 +456,7 @@ function NewSessionContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const scenarioId = searchParams.get("scenario_id");
+  const campaignId = searchParams.get("campaign_id") ?? undefined;
   const debtorName = searchParams.get("debtor_name") ?? undefined;
 
   const { status, error, sessionId, createSession, reset } = useSessionStore();
@@ -480,9 +481,9 @@ function NewSessionContent() {
     if (!scenarioId) return;
     if (status === "idle" && !hasInitiated.current) {
       hasInitiated.current = true;
-      createSession(scenarioId);
+      createSession(scenarioId, campaignId);
     }
-  }, [scenarioId, status, createSession]);
+  }, [scenarioId, campaignId, status, createSession]);
 
   // Connecting: wait for min ring time + GSAP exit, then navigate
   useEffect(() => {
@@ -520,7 +521,7 @@ function NewSessionContent() {
         title="Couldn't start the session"
         message={error ?? "An unexpected error occurred."}
         onBack={() => { reset(); router.push("/scenarios"); }}
-        onRetry={() => { reset(); createSession(scenarioId); }}
+        onRetry={() => { reset(); createSession(scenarioId, campaignId); }}
       />
     );
   }
