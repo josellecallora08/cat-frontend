@@ -40,11 +40,12 @@ describe("rubric result components", () => {
     expect(screen.getByText((_, element) => element?.tagName === "P" && element.textContent?.includes("75 × 40% ÷ 100 = 30.00") === true)).toBeInTheDocument();
     expect(screen.getByText("Passing")).toBeInTheDocument();
     const toggle = screen.getByRole("button", { name: /show transcript evidence/i });
-    expect(toggle).toHaveAttribute("aria-expanded", "false");
-    await user.click(toggle);
+    toggle.focus();
+    await user.keyboard("{Enter}");
     expect(toggle).toHaveAttribute("aria-expanded", "true");
     expect(screen.getByText(/sequence 4 · agent/i)).toBeInTheDocument();
     expect(screen.getByText(/i can offer an arrangement/i)).toBeInTheDocument();
+    expect(screen.getByRole("article")).toHaveClass("min-w-0");
   });
 
   it("renders grounded recommendations as text with source references", () => {

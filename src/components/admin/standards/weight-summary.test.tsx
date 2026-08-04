@@ -8,6 +8,8 @@ describe("WeightSummary", () => {
     const { rerender } = render(<WeightSummary total={80} />);
     const liveRegion = screen.getByText("80%").parentElement;
     expect(liveRegion).toHaveAttribute("aria-live", "polite");
+    expect(liveRegion).toHaveAttribute("aria-atomic", "true");
+    expect(screen.getByLabelText("Weights need attention")).toBeInTheDocument();
     expect(screen.getByText("20% remaining")).toBeInTheDocument();
 
     rerender(<WeightSummary total={100} />);

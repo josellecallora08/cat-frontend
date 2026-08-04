@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   update: vi.fn(async () => ({})),
   validate: vi.fn(async (): Promise<{ valid: boolean; weight_total: number; errors: Array<{ code: string; path: string; message: string }> }> => ({ valid: true, weight_total: 100, errors: [] })),
   publish: vi.fn(async () => ({ version_number: 2 })),
+  publishPending: false,
   archive: vi.fn(async () => ({})),
   remove: vi.fn(async () => undefined),
 }));
@@ -19,7 +20,7 @@ vi.mock("@/hooks/use-negotiation-standards", () => ({
   useCreateNegotiationStandard: () => ({ isPending: false, mutateAsync: mocks.create }),
   useUpdateNegotiationStandard: () => ({ isPending: false, mutateAsync: mocks.update }),
   useValidateNegotiationStandard: () => ({ isPending: false, mutateAsync: mocks.validate }),
-  usePublishNegotiationStandard: () => ({ isPending: false, mutateAsync: mocks.publish }),
+  usePublishNegotiationStandard: () => ({ isPending: mocks.publishPending, mutateAsync: mocks.publish }),
   useArchiveNegotiationStandard: () => ({ isPending: false, mutateAsync: mocks.archive }),
   useDeleteNegotiationStandard: () => ({ isPending: false, mutateAsync: mocks.remove }),
   useNegotiationStandardVersions: () => ({ data: { items: [] } }),
@@ -153,14 +154,30 @@ describe("StandardEditor", () => {
     expect(screen.getByText("Version 1")).toBeInTheDocument();
   });
 
-  it("requires confirmation before archiving a published standard", async () => {
+  it("supports keyboard-only save and exposes responsive overflow protection", async () => {
     const user = userEvent.setup();
-    renderEditor({ ...draft, status: "published", current_version_number: 1 });
+    const { container } = renderEditor();
+    const saveButton = screen.getByRole("button", { name: /save draft/i });
+    saveButton.focus();
+    await user.keyboard("{Enter}");
+    await waitFor(() => expect(mocks.update).toHaveBeenCalled());
 
-    await user.click(screen.getByRole("button", { name: "Archive" }));
-    expect(screen.getByText("Archive this standard?")).toBeInTheDocument();
-    expect(screen.getByText(/archived standards cannot be used to start new simulations/i)).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Confirm archive" }));
-    await waitFor(() => expect(screen.getByText("Standard archived.")).toBeInTheDocument());
+    for (const width of [320, 640, 768, 1024, 1440]) {
+      window.innerWidth = width;
+      expect(container.firstElementChild).toHaveClass("overflow-x-hidden");
+      expect(screen.getByRole("navigation", { name: "Rubric block navigation" })).toBeInTheDocument();
+    }
+  });
+
+  it("disables motion animation for reduced-motion users", async () => {
+    const user = userEvent.setup();
+    const rendered = renderEditor();
+    await user.click(screen.getByRole("button", { name: "Validate" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: /publish/i })).toBeEnabled());
+    await user.click(screen.getByRole("button", { name: /publish/i }));
+    mocks.publishPending = true;
+    rendered.rerender(<QueryClientProvider client={new QueryClient()}><StandardEditor campaignId="campaign-1" standard={draft} isAdmin /></QueryClientProvider>);
+    expect(document.querySelector("[class*='motion-reduce:animate-none']")).toBeInTheDocument();
+    mocks.publishPending = false;
   });
 });

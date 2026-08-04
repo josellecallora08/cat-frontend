@@ -30,7 +30,9 @@ describe("VersionHistory", () => {
     const onSelect = vi.fn();
     render(<VersionHistory versions={[version]} onSelect={onSelect} />);
     const button = screen.getByRole("button", { name: /version 1/i });
-    await user.click(button);
+    button.focus();
+    await user.keyboard("{Enter}");
+    expect(button).toHaveFocus();
     expect(onSelect).toHaveBeenCalledWith(version);
   });
 });

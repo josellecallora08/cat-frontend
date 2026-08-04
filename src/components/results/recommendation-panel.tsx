@@ -12,7 +12,7 @@ export function RecommendationPanel({ recommendations }: RecommendationPanelProp
   }
 
   return (
-    <section aria-labelledby="rubric-recommendations-heading" className="space-y-3 rounded-xl border border-border bg-card p-4">
+    <section aria-labelledby="rubric-recommendations-heading" className="min-w-0 space-y-3 rounded-xl border border-border bg-card p-4">
       <div className="flex items-center gap-2"><Sparkles className="h-4 w-4 text-primary" aria-hidden="true" /><h3 id="rubric-recommendations-heading" className="text-base font-semibold text-foreground">Recommended responses</h3></div>
       <ul className="space-y-3">
         {recommendations.map((recommendation) => (

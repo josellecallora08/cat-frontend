@@ -14,7 +14,7 @@ export function RubricScoreCard({ category, transcript = [] }: RubricScoreCardPr
   const scoreLabel = score === null ? "Not applicable" : `${score}/100`;
 
   return (
-    <article className="space-y-4 rounded-xl border border-border bg-card p-4" aria-labelledby={`rubric-${category.rubric_block_id}`}>
+    <article className="min-w-0 space-y-4 rounded-xl border border-border bg-card p-4" aria-labelledby={`rubric-${category.rubric_block_id}`}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h3 id={`rubric-${category.rubric_block_id}`} className="text-base font-semibold text-foreground">{category.category}</h3>
