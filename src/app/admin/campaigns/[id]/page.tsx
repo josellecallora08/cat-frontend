@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Loader2, Pencil, Target, TrendingUp } from "lucide-react";
+import { ArrowLeft, Loader2, Pencil, SlidersHorizontal, Target, TrendingUp } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { use, useCallback, useState } from "react";
@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/dialog";
 import { Select } from "@/components/ui/select";
 import { useCampaign, useUpdateCampaign } from "@/hooks/use-campaigns";
+import { useNegotiationStandard } from "@/hooks/use-negotiation-standards";
 import type { CampaignUpdatePayload } from "@/lib/api/campaigns";
 import { useAuthStore } from "@/stores/auth-store";
 
@@ -76,6 +77,7 @@ export default function CampaignDetailPage({
   const { id } = use(params);
   const router = useRouter();
   const { data: campaign, isLoading, isError, refetch } = useCampaign(id);
+  const standardQuery = useNegotiationStandard(id);
 
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [formData, setFormData] = useState({
@@ -197,6 +199,15 @@ export default function CampaignDetailPage({
   }
 
   const dateRange = formatDateRange(campaign.start_date, campaign.end_date);
+  const standard = standardQuery.data;
+  const draftWeightTotal = standard?.draft_content?.blocks.reduce((sum, block) => sum + block.weight, 0);
+  const standardReadiness = standard
+    ? standard.status === "published"
+      ? `Published${standard.current_version_number ? ` · v${standard.current_version_number}` : ""}`
+      : `${draftWeightTotal ?? 0}% draft weight`
+    : standardQuery.isLoading
+      ? "Loading standard…"
+      : "Not configured";
 
   return (
     <PageContent>
@@ -222,6 +233,18 @@ export default function CampaignDetailPage({
             >
               {campaign.status}
             </Badge>
+            <div className="flex flex-col items-end gap-1">
+              <Link
+                href={`/admin/campaigns/${id}/standards`}
+                className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-border px-3 text-sm font-medium text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
+                Standards
+              </Link>
+              <span className="text-xs text-muted-foreground" aria-label={`Standard readiness: ${standardReadiness}`}>
+                {standardReadiness}
+              </span>
+            </div>
             <Button
               variant="outline"
               size="sm"
