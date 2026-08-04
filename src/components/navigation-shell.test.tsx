@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -15,6 +16,12 @@ vi.mock("gsap", () => ({
 }));
 
 describe("NavigationShell script administration placement", () => {
+  const renderNavigation = () => render(
+    <QueryClientProvider client={new QueryClient()}>
+      <NavigationShell><div>Page</div></NavigationShell>
+    </QueryClientProvider>,
+  );
+
   beforeEach(() => {
     useAuthStore.setState({
       user: {
@@ -30,14 +37,14 @@ describe("NavigationShell script administration placement", () => {
   });
 
   it("removes Scripts and Uploads from the main navigation", () => {
-    render(<NavigationShell><div>Page</div></NavigationShell>);
+    renderNavigation();
     const navigation = screen.getByRole("navigation", { name: /main navigation/i });
     expect(within(navigation).queryByText("Scripts")).not.toBeInTheDocument();
     expect(within(navigation).queryByText("Uploads")).not.toBeInTheDocument();
   });
 
   it("shows Scripts inside the administrator account menu", () => {
-    render(<NavigationShell><div>Page</div></NavigationShell>);
+    renderNavigation();
     fireEvent.click(screen.getByRole("button", { name: /account menu/i }));
     expect(screen.getByRole("button", { name: /scripts/i })).toBeInTheDocument();
   });
@@ -53,7 +60,7 @@ describe("NavigationShell script administration placement", () => {
         is_active: true,
       },
     });
-    render(<NavigationShell><div>Page</div></NavigationShell>);
+    renderNavigation();
     fireEvent.click(screen.getByRole("button", { name: /account menu/i }));
     expect(screen.queryByRole("button", { name: /scripts/i })).not.toBeInTheDocument();
   });

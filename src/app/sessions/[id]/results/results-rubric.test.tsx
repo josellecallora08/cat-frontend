@@ -1,0 +1,66 @@
+import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { describe, expect, it } from "vitest";
+
+import type { RubricCategoryScore, RubricRecommendation } from "@/lib/api/sessions";
+import { RecommendationPanel } from "@/components/results/recommendation-panel";
+import { RubricScoreCard } from "@/components/results/rubric-score-card";
+
+const category: RubricCategoryScore = {
+  rubric_block_id: "compliance",
+  category: "Compliance",
+  raw_score: 80,
+  penalty_total: 5,
+  penalized_score: 75,
+  weight: 40,
+  weighted_contribution: 30,
+  passing_score: 70,
+  passed: true,
+  evidence: [{ sequence_number: 4, speaker: "agent", excerpt: "I can offer an arrangement.", explanation: "The agent offered a compliant option." }],
+  strengths: [{ criterion_id: "options", explanation: "Offered a clear option.", evidence_sequence_numbers: [4] }],
+  violations: [],
+  failed_criteria: [],
+  recommendation_inputs: [],
+};
+
+const recommendation: RubricRecommendation = {
+  rubric_block_id: "compliance",
+  criterion_id: "options",
+  evidence_sequence_number: 4,
+  explanation: "The response could acknowledge the concern first.",
+  recommended_response: "I understand the concern; let us review the available options.",
+  coaching_advice: "Pair the option with an empathy statement.",
+};
+
+describe("rubric result components", () => {
+  it("shows deterministic category calculations and accessible evidence disclosure", async () => {
+    const user = userEvent.setup();
+    render(<RubricScoreCard category={category} transcript={[{ sequence_number: 4, speaker: "agent", text: "I can offer an arrangement.", timestamp: "2026-01-01T00:00:00Z" }]} />);
+
+    expect(screen.getByText((_, element) => element?.tagName === "P" && element.textContent?.includes("75 × 40% ÷ 100 = 30.00") === true)).toBeInTheDocument();
+    expect(screen.getByText("Passing")).toBeInTheDocument();
+    const toggle = screen.getByRole("button", { name: /show transcript evidence/i });
+    toggle.focus();
+    await user.keyboard("{Enter}");
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByText(/sequence 4 · agent/i)).toBeInTheDocument();
+    expect(screen.getByText(/i can offer an arrangement/i)).toBeInTheDocument();
+    expect(screen.getByRole("article")).toHaveClass("min-w-0");
+  });
+
+  it("renders grounded recommendations as text with source references", () => {
+    render(<RecommendationPanel recommendations={[recommendation]} />);
+
+    expect(screen.getByText(recommendation.recommended_response)).toBeInTheDocument();
+    expect(screen.getByText(/transcript sequence 4/i)).toBeInTheDocument();
+    expect(document.querySelector("[dangerouslySetInnerHTML]")).not.toBeInTheDocument();
+  });
+
+  it("handles empty recommendations and no-evidence states", () => {
+    render(<div><RecommendationPanel recommendations={[]} /><RubricScoreCard category={{ ...category, evidence: [], passed: false, penalized_score: null, raw_score: null }} /></div>);
+
+    expect(screen.getByText(/no additional recommendations/i)).toBeInTheDocument();
+    expect(screen.getByText(/no transcript evidence/i)).toBeInTheDocument();
+    expect(screen.getAllByText("Not applicable").length).toBeGreaterThan(0);
+  });
+});
