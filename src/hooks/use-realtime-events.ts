@@ -4,19 +4,10 @@ import type { QueryClient } from "@tanstack/react-query";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
 
+import { getWsBaseUrl } from "@/lib/websocket-url";
 import { useAuthStore } from "@/stores/auth-store";
 import { useRealtimeStore } from "@/stores/realtime-store";
 import type { EventPayload } from "@/types/realtime";
-
-/**
- * Base URL for WebSocket connections.
- * Uses NEXT_PUBLIC_WS_URL env var if set, otherwise derives from window location.
- */
-const WS_BASE_URL =
-  process.env.NEXT_PUBLIC_WS_URL ??
-  (typeof window !== "undefined"
-    ? `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}`
-    : "ws://localhost:8000");
 
 /**
  * Mapping from event type strings to the TanStack Query keys that
@@ -137,7 +128,7 @@ export function useRealtimeEvents(): void {
         params.set("last_seq", String(lastSeqRef.current));
       }
 
-      const url = `${WS_BASE_URL}/ws/events?${params.toString()}`;
+      const url = `${getWsBaseUrl()}/ws/events?${params.toString()}`;
       ws = new WebSocket(url);
       setStatus("connecting");
 

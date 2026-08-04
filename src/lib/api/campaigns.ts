@@ -1,3 +1,9 @@
+
+import type {
+    AgentCampaignWithProgress,
+    CampaignProgressResponse,
+} from "@/types/campaign-selection";
+
 export interface CampaignScenarioItem {
   id: string;
   name: string;
@@ -163,4 +169,34 @@ export async function deleteCampaign(
   if (!response.ok) {
     throw new Error(`Failed to delete campaign: ${response.status}`);
   }
+}
+
+export async function fetchAgentCampaigns(
+  token: string
+): Promise<AgentCampaignWithProgress[]> {
+  const response = await fetch(`${API_BASE_URL}/api/campaigns/my`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch agent campaigns: ${response.status}`);
+  }
+
+  return response.json();
+}
+
+export async function fetchCampaignProgress(
+  campaignId: string,
+  token: string
+): Promise<CampaignProgressResponse> {
+  const response = await fetch(
+    `${API_BASE_URL}/api/campaigns/${encodeURIComponent(campaignId)}/progress`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch campaign progress: ${response.status}`);
+  }
+
+  return response.json();
 }
