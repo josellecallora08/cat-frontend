@@ -236,10 +236,11 @@ export default function CampaignDetailPage({
             <div className="flex flex-col items-end gap-1">
               <Link
                 href={`/admin/campaigns/${id}/standards`}
+                aria-label={`Manage negotiation standards for ${campaign.name}`}
                 className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-border px-3 text-sm font-medium text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
-                Standards
+                Negotiation standards
               </Link>
               <span className="text-xs text-muted-foreground" aria-label={`Standard readiness: ${standardReadiness}`}>
                 {standardReadiness}

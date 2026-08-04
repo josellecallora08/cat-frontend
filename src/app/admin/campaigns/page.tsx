@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
@@ -44,6 +45,7 @@ import {
     Megaphone,
     Pencil,
     Plus,
+    SlidersHorizontal,
     Target,
     Trash2,
     TrendingUp,
@@ -402,27 +404,36 @@ export default function AdminCampaignsPage() {
                         {new Date(c.updated_at).toLocaleDateString()}
                       </td>
                       <td className="py-3">
-                        <div className="flex items-center gap-1">
+                        <div className="flex flex-wrap items-center gap-1">
+                          <Link
+                            href={`/admin/campaigns/${c.id}/standards`}
+                            aria-label={`Manage negotiation standards for ${c.name}`}
+                            title="Manage negotiation standards"
+                            className="inline-flex min-h-11 items-center gap-1 rounded-lg border border-border px-2.5 text-xs font-medium text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          >
+                            <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
+                            <span className="hidden xl:inline">Standards</span>
+                          </Link>
                           <button
                             onClick={() => router.push(`/admin/campaigns/${c.id}`)}
                             aria-label={`View ${c.name}`}
-                            className="rounded p-1 text-muted-foreground hover:text-foreground"
+                            className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                           >
-                            <Eye className="h-4 w-4" />
+                            <Eye className="h-4 w-4" aria-hidden="true" />
                           </button>
                           <button
                             onClick={() => openEditDialog(c.id)}
                             aria-label={`Edit ${c.name}`}
-                            className="rounded p-1 text-muted-foreground hover:text-foreground"
+                            className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                           >
-                            <Pencil className="h-4 w-4" />
+                            <Pencil className="h-4 w-4" aria-hidden="true" />
                           </button>
                           <button
                             onClick={() => setDeleteId(c.id)}
                             aria-label={`Delete ${c.name}`}
-                            className="rounded p-1 text-muted-foreground hover:text-destructive"
+                            className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                           >
-                            <Trash2 className="h-4 w-4" />
+                            <Trash2 className="h-4 w-4" aria-hidden="true" />
                           </button>
                         </div>
                       </td>

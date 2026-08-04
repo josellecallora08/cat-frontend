@@ -83,7 +83,7 @@ describe("StandardEditor", () => {
     mocks.publish.mockResolvedValue({ version_number: 2 });
   });
 
-  it("adds and removes nested rubric items and reorders blocks", async () => {
+  it("adds and removes nested rubric items and keeps the selected block active while reordering", async () => {
     const user = userEvent.setup();
     renderEditor();
 
@@ -97,8 +97,9 @@ describe("StandardEditor", () => {
     await user.click(screen.getByRole("button", { name: /remove penalty for late/i }));
     expect(screen.queryByLabelText("Deduction")).not.toBeInTheDocument();
 
+    await user.click(screen.getByRole("tab", { name: /02Closing50% weight/i }));
     await user.click(screen.getByRole("button", { name: "Move Closing up" }));
-    expect(screen.getByRole("link", { name: /Closing\s*50%/i })).toHaveAttribute("href", "#block-closing");
+    expect(screen.getByRole("tab", { name: /02Closing50% weight/i })).toHaveAttribute("aria-selected", "true");
   });
 
   it("keeps saving enabled for an invalid total and announces the updated weight", async () => {
@@ -151,7 +152,7 @@ describe("StandardEditor", () => {
     expect(screen.getByLabelText("Standard name")).toBeDisabled();
     expect(screen.queryByRole("button", { name: "Add rubric block" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Add behavior" })).not.toBeInTheDocument();
-    expect(screen.getByText("Version 1")).toBeInTheDocument();
+    expect(screen.getAllByText("Version 1").length).toBeGreaterThan(0);
   });
 
   it("supports keyboard-only save and exposes responsive overflow protection", async () => {
@@ -165,7 +166,7 @@ describe("StandardEditor", () => {
     for (const width of [320, 640, 768, 1024, 1440]) {
       window.innerWidth = width;
       expect(container.firstElementChild).toHaveClass("overflow-x-hidden");
-      expect(screen.getByRole("navigation", { name: "Rubric block navigation" })).toBeInTheDocument();
+      expect(screen.getByRole("tablist", { name: "Rubric block navigation" })).toBeInTheDocument();
     }
   });
 
