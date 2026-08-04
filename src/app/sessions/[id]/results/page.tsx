@@ -6,6 +6,7 @@ import {
   useEvaluation,
   useCoaching,
   useLearningPlan,
+  useTranscript,
 } from "@/hooks/use-session-results";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -20,6 +21,8 @@ import {
 } from "lucide-react";
 import { CatMascotSvg } from "@/components/auth/CatMascotSvg";
 import { OrangeCatMascot } from "@/components/results/OrangeCatMascot";
+import { RecommendationPanel } from "@/components/results/recommendation-panel";
+import { RubricScoreCard } from "@/components/results/rubric-score-card";
 import type { CatEmotion } from "@/components/results/OrangeCatMascot";
 import confetti from "canvas-confetti";
 import type {
@@ -29,6 +32,7 @@ import type {
   CompetencyScore,
   MistakeItem,
   LearningPlanItem,
+  TranscriptEntry,
 } from "@/lib/api/sessions";
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -38,21 +42,21 @@ const CATEGORY_LABELS: Record<string, string> = {
   negotiation_resolution: "Negotiation & Resolution",
 };
 
-const CATEGORY_WEIGHTS: Record<string, number> = {
+const LEGACY_CATEGORY_WEIGHTS: Record<string, number> = {
   call_opening: 0.2,
   compliance: 0.3,
   empathy_communication: 0.25,
   negotiation_resolution: 0.25,
 };
 
-const PASS_THRESHOLD = 70;
+const LEGACY_PASS_THRESHOLD = 70;
 
 function formatCategoryLabel(category: string): string {
   return CATEGORY_LABELS[category] ?? category.replace(/_/g, " ");
 }
 
 function formatWeight(category: string): string {
-  const weight = CATEGORY_WEIGHTS[category];
+  const weight = LEGACY_CATEGORY_WEIGHTS[category];
   return weight ? `${Math.round(weight * 100)}%` : "";
 }
 
@@ -66,6 +70,30 @@ function scoreToneBar(s: number): string {
   if (s >= 80) return "bg-[#22C55E]";
   if (s >= 60) return "bg-[#F59E0B]";
   return "bg-[#EF4444]";
+}
+
+function getOverallScore(data: EvaluationResult): number {
+  return data.weighted_total ?? data.overall_score;
+}
+
+function getPassingThreshold(data: EvaluationResult): number {
+  return data.passing_score ?? LEGACY_PASS_THRESHOLD;
+}
+
+function isEvaluationPassing(data: EvaluationResult): boolean {
+  return data.passed ?? getOverallScore(data) >= getPassingThreshold(data);
+}
+
+function StandardContext({ data }: { data: EvaluationResult }) {
+  if (!data.standard_name && !data.standard_version_number) {
+    return <p className="text-xs text-muted-foreground">Legacy session · rubric version unavailable</p>;
+  }
+  return (
+    <div className="flex flex-wrap items-center justify-center gap-2 text-xs text-muted-foreground" aria-label="Pinned negotiation standard">
+      <span className="font-medium text-foreground">{data.standard_name ?? "Negotiation standard"}</span>
+      {data.standard_version_number !== null && data.standard_version_number !== undefined && <span>Version {data.standard_version_number}</span>}
+    </div>
+  );
 }
 
 // --- Loading screen with cat ---
@@ -143,38 +171,21 @@ function StepNav({
 }
 
 // --- Step 1: Evaluation scores ---
-function EvaluationStep({ data }: { data: EvaluationResult }) {
+function EvaluationStep({ data, transcript }: { data: EvaluationResult; transcript: TranscriptEntry[] }) {
+  const canonical = data.rubric_result;
+  if (canonical?.status === "not_applicable") {
+    return <div role="status" className="space-y-3 rounded-xl border border-[#F59E0B]/30 bg-[#F59E0B]/5 p-5 text-sm text-muted-foreground"><StandardContext data={data} /><p>Evaluation not applicable: {canonical.summary}</p></div>;
+  }
+  if (canonical?.categories.length) {
+    return <div className="space-y-4"><StandardContext data={data} />{canonical.categories.map((category) => <RubricScoreCard key={category.rubric_block_id} category={category} transcript={transcript} />)}</div>;
+  }
+
   return (
     <div className="space-y-5">
-      {data.is_too_short && (
-        <div className="flex items-center gap-3 rounded-xl border border-[#F59E0B]/30 bg-[#F59E0B]/5 px-4 py-3">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#F59E0B]">
-            <AlertTriangle className="h-4 w-4 text-white" />
-          </div>
-          <p className="text-xs text-muted-foreground text-left">
-            Short session — scores may be less accurate with fewer turns.
-          </p>
-        </div>
-      )}
+      <StandardContext data={data} />
+      {data.is_too_short && <div className="flex items-center gap-3 rounded-xl border border-[#F59E0B]/30 bg-[#F59E0B]/5 px-4 py-3"><AlertTriangle className="h-4 w-4 text-[#F59E0B]" aria-hidden="true" /><p className="text-xs text-muted-foreground text-left">Short session — scores may be less accurate with fewer turns.</p></div>}
       <div className="space-y-4">
-        {data.category_scores.map((item: CompetencyScore) => (
-          <div key={item.category} className="space-y-1.5">
-            <div className="flex justify-between text-sm">
-              <span className="font-medium text-foreground">
-                {formatCategoryLabel(item.category)}
-              </span>
-              <span className="text-muted-foreground">
-                {item.score}/100{formatWeight(item.category) && ` · ${formatWeight(item.category)}`}
-              </span>
-            </div>
-            <div className="h-2.5 w-full overflow-hidden rounded-full bg-muted">
-              <div
-                className={cn("h-full rounded-full transition-all", scoreToneBar(item.score))}
-                style={{ width: `${item.score}%` }}
-              />
-            </div>
-          </div>
-        ))}
+        {data.category_scores.map((item: CompetencyScore) => <div key={item.category} className="space-y-1.5"><div className="flex justify-between text-sm"><span className="font-medium text-foreground">{formatCategoryLabel(item.category)}</span><span className="text-muted-foreground">{item.score}/100{formatWeight(item.category) && ` · ${formatWeight(item.category)}`}</span></div><div className="h-2.5 w-full overflow-hidden rounded-full bg-muted"><div className={cn("h-full rounded-full transition-all", scoreToneBar(item.score))} style={{ width: `${item.score}%` }} /></div></div>)}
       </div>
     </div>
   );
@@ -247,17 +258,12 @@ function WeaknessesStep({ data }: { data: EvaluationResult }) {
 }
 
 // --- Step 4: Coaching report ---
-function CoachingStep({ data }: { data: CoachingReport }) {
-  if (data.no_mistakes) {
+function CoachingStep({ data, evaluation }: { data: CoachingReport; evaluation: EvaluationResult }) {
+  const recommendations = evaluation.rubric_result?.recommendations ?? data.rubric_recommendations ?? [];
+  if (data.no_mistakes && recommendations.length === 0) {
     return (
       <div className="space-y-4">
-        <div className="rounded-xl border border-[#22C55E]/30 bg-[#22C55E]/5 p-5 text-center">
-          <CheckCircle2 className="mx-auto h-6 w-6 text-[#22C55E]" />
-          <p className="mt-2 text-sm font-medium text-foreground">Excellent work</p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            No mistakes identified. Strong performance across all categories.
-          </p>
-        </div>
+        <div className="rounded-xl border border-[#22C55E]/30 bg-[#22C55E]/5 p-5 text-center"><CheckCircle2 className="mx-auto h-6 w-6 text-[#22C55E]" /><p className="mt-2 text-sm font-medium text-foreground">Excellent work</p><p className="mt-1 text-xs text-muted-foreground">No mistakes identified. Strong performance across all categories.</p></div>
       </div>
     );
   }
@@ -265,47 +271,14 @@ function CoachingStep({ data }: { data: CoachingReport }) {
   const categories = Object.keys(data.mistakes_by_category);
   return (
     <div className="space-y-4">
-      <p className="text-sm text-muted-foreground">
-        {data.total_mistakes} improvement {data.total_mistakes === 1 ? "opportunity" : "opportunities"} identified
-      </p>
-      <div className="space-y-4">
-        {categories.map((category) => {
-          const mistakes = data.mistakes_by_category[category];
-          if (!mistakes || mistakes.length === 0) return null;
-          return (
-            <div key={category} className="space-y-2">
-              <h3 className="text-sm font-semibold text-foreground">
-                {formatCategoryLabel(category)}
-              </h3>
-              <ul className="space-y-2">
-                {mistakes.map((mistake: MistakeItem, i: number) => (
-                  <li key={i} className="rounded-xl border border-border p-4 space-y-2">
-                    {mistake.transcript_excerpt && (
-                      <blockquote className="border-l-2 border-border pl-2 text-xs italic text-muted-foreground">
-                        &ldquo;{mistake.transcript_excerpt}&rdquo;
-                      </blockquote>
-                    )}
-                    <p className="text-sm text-foreground">
-                      <span className="font-medium text-[#EF4444]">Issue: </span>
-                      {mistake.explanation}
-                    </p>
-                    <p className="text-sm text-foreground">
-                      <span className="font-medium text-[#22C55E]">Try instead: </span>
-                      {mistake.recommended_alternative}
-                    </p>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          );
-        })}
-      </div>
+      {recommendations.length > 0 && <RecommendationPanel recommendations={recommendations} />}
+      {data.no_mistakes ? <div className="rounded-xl border border-[#22C55E]/30 bg-[#22C55E]/5 p-5 text-center"><CheckCircle2 className="mx-auto h-6 w-6 text-[#22C55E]" /><p className="mt-2 text-sm font-medium text-foreground">No mistakes identified</p></div> : <><p className="text-sm text-muted-foreground">{data.total_mistakes} improvement {data.total_mistakes === 1 ? "opportunity" : "opportunities"} identified</p><div className="space-y-4">{categories.map((category) => { const mistakes = data.mistakes_by_category[category]; if (!mistakes || mistakes.length === 0) return null; return <div key={category} className="space-y-2"><h3 className="text-sm font-semibold text-foreground">{formatCategoryLabel(category)}</h3><ul className="space-y-2">{mistakes.map((mistake: MistakeItem) => <li key={`${mistake.transcript_position}-${mistake.explanation}`} className="space-y-2 rounded-xl border border-border p-4"><blockquote className="border-l-2 border-border pl-2 text-xs italic text-muted-foreground">“{mistake.transcript_excerpt}”</blockquote><p className="text-sm text-foreground"><span className="font-medium text-[#EF4444]">Issue: </span>{mistake.explanation}</p><p className="text-sm text-foreground"><span className="font-medium text-[#22C55E]">Try instead: </span>{mistake.recommended_alternative}</p></li>)}</ul></div>;})}</div></>}
     </div>
   );
 }
 
 // --- Step 5: Learning plan ---
-function LearningPlanStep({ data }: { data: LearningPlan }) {
+function LearningPlanStep({ data, passingScore }: { data: LearningPlan; passingScore: number }) {
   if (data.all_passing) {
     return (
       <div className="space-y-4">
@@ -333,7 +306,7 @@ function LearningPlanStep({ data }: { data: LearningPlan }) {
                 {formatCategoryLabel(item.category)}
               </p>
               <p className="text-xs text-muted-foreground">
-                Scored {item.score}/100 · below passing ({PASS_THRESHOLD})
+                Scored {item.score}/100 · below passing ({passingScore})
               </p>
             </div>
             <Link href={`/?recommended=${encodeURIComponent(item.recommended_scenario)}`}>
@@ -351,13 +324,15 @@ function LearningPlanStep({ data }: { data: LearningPlan }) {
 
 // --- Step 6: Overall score ---
 function OverallScoreStep({ data }: { data: EvaluationResult }) {
-  const overall = data.overall_score;
-  const passing = data.category_scores.filter((c) => c.score >= PASS_THRESHOLD).length;
-  const total = data.category_scores.length;
+  const overall = getOverallScore(data);
+  const threshold = getPassingThreshold(data);
+  const passing = data.rubric_result?.categories.filter((category) => category.passed).length ?? data.category_scores.filter((c) => c.score >= threshold).length;
+  const total = data.rubric_result?.categories.length ?? data.category_scores.length;
+  const passed = isEvaluationPassing(data);
   const hasFired = useRef(false);
 
   useEffect(() => {
-    if ((overall ?? 0) >= 70 && !hasFired.current) {
+    if (passed && !hasFired.current) {
       hasFired.current = true;
       // Fire confetti from both sides
       const end = Date.now() + 1500;
@@ -368,7 +343,7 @@ function OverallScoreStep({ data }: { data: EvaluationResult }) {
         if (Date.now() < end) requestAnimationFrame(frame);
       })();
     }
-  }, [overall]);
+  }, [overall, passed]);
 
   return (
     <div className="space-y-6 text-center">
@@ -378,10 +353,10 @@ function OverallScoreStep({ data }: { data: EvaluationResult }) {
           <span className="text-xl font-medium text-muted-foreground">/100</span>
         </p>
         <p className="mt-3 text-sm text-muted-foreground">
-          Competencies passing: {passing} of {total}
+          Competencies passing: {passing} of {total} · passing threshold: {threshold}
         </p>
       </div>
-      {(overall ?? 0) >= 70 ? (
+      {passed ? (
         <div className="rounded-xl border border-[#22C55E]/30 bg-[#22C55E]/5 p-4">
           <Trophy className="mx-auto h-6 w-6 text-[#22C55E]" />
           <p className="mt-2 text-sm font-medium text-[#22C55E]">Great job!</p>
@@ -405,13 +380,16 @@ function OverallScoreStep({ data }: { data: EvaluationResult }) {
 }
 
 // --- Step 7: Full summary — bento grid layout ---
-function SummaryStep({ sessionId, data, coaching, learningPlan }: { sessionId: string; data: EvaluationResult; coaching: CoachingReport | null; learningPlan: LearningPlan | null }) {
-  const overall = data.overall_score;
-  const passing = data.category_scores.filter((c) => c.score >= PASS_THRESHOLD).length;
-  const total = data.category_scores.length;
+function SummaryStep({ data, coaching, learningPlan }: { data: EvaluationResult; coaching: CoachingReport | null; learningPlan: LearningPlan | null }) {
+  const overall = getOverallScore(data);
+  const threshold = getPassingThreshold(data);
+  const passing = data.rubric_result?.categories.filter((category) => category.passed).length ?? data.category_scores.filter((c) => c.score >= threshold).length;
+  const total = data.rubric_result?.categories.length ?? data.category_scores.length;
+  const passed = isEvaluationPassing(data);
 
   return (
     <div className="space-y-4 w-full max-w-2xl mx-auto">
+      <StandardContext data={data} />
       {/* Bento grid */}
       <div className="grid grid-cols-2 gap-3">
         {/* Overall score — spans full width */}
@@ -420,19 +398,11 @@ function SummaryStep({ sessionId, data, coaching, learningPlan }: { sessionId: s
           <p className={cn("mt-1 text-4xl font-bold leading-none", scoreToneText(overall ?? 0))}>
             {Math.round(overall ?? 0)}<span className="text-base font-medium text-muted-foreground">/100</span>
           </p>
-          <p className="mt-1 text-xs text-muted-foreground">{passing} of {total} competencies passing</p>
+          <p className="mt-1 text-xs font-medium text-foreground">{passed ? "Passed" : "Needs practice"} · {passing} of {total} competencies passing · threshold {threshold}</p>
         </div>
 
         {/* Category scores — each in its own cell, no bg/border */}
-        {data.category_scores.map((item: CompetencyScore) => (
-          <div key={item.category} className="p-4 space-y-2">
-            <p className="text-xs font-medium text-muted-foreground">{formatCategoryLabel(item.category)}</p>
-            <p className={cn("text-2xl font-bold", scoreToneText(item.score))}>{item.score}</p>
-            <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
-              <div className={cn("h-full rounded-full", scoreToneBar(item.score))} style={{ width: `${item.score}%` }} />
-            </div>
-          </div>
-        ))}
+        {data.rubric_result?.categories ? data.rubric_result.categories.map((item) => <div key={item.rubric_block_id} className="p-4 space-y-2"><p className="text-xs font-medium text-muted-foreground">{item.category}</p><p className={cn("text-2xl font-bold", scoreToneText(item.penalized_score ?? 0))}>{item.penalized_score ?? "N/A"}</p><p className="text-xs text-muted-foreground">{item.weighted_contribution.toFixed(2)} weighted points · {item.passed ? "Passing" : "Needs practice"}</p></div>) : data.category_scores.map((item: CompetencyScore) => <div key={item.category} className="p-4 space-y-2"><p className="text-xs font-medium text-muted-foreground">{formatCategoryLabel(item.category)}</p><p className={cn("text-2xl font-bold", scoreToneText(item.score))}>{item.score}</p><div className="h-1.5 w-full overflow-hidden rounded-full bg-muted"><div className={cn("h-full rounded-full", scoreToneBar(item.score))} style={{ width: `${item.score}%` }} /></div></div>)}
 
         {/* Strengths — spans full width */}
         {data.strengths && data.strengths.length > 0 && (
@@ -544,6 +514,7 @@ export default function SessionResultsPage({
 }) {
   const { id } = use(params);
   const evaluation = useEvaluation(id);
+  const transcript = useTranscript(id);
   const coaching = useCoaching(id);
   const learningPlan = useLearningPlan(id);
   const [step, setStep] = useState(0);
@@ -551,7 +522,7 @@ export default function SessionResultsPage({
   const TOTAL_STEPS = 7;
 
   // Show cat loading while any data is still loading
-  const isLoading = evaluation.isLoading || coaching.isLoading || learningPlan.isLoading;
+  const isLoading = evaluation.isLoading || transcript.isLoading || coaching.isLoading || learningPlan.isLoading;
 
   if (isLoading) {
     return <CatLoading />;
@@ -576,7 +547,7 @@ export default function SessionResultsPage({
     "worried",      // 2: Weaknesses
     "thinking",     // 3: Coaching
     "encouraging",  // 4: Learning plan
-    (evaluation.data.overall_score ?? 0) >= 70 ? "celebrating" : "encouraging", // 5: Overall score
+    getOverallScore(evaluation.data) >= getPassingThreshold(evaluation.data) ? "celebrating" : "encouraging", // 5: Overall score
     "proud",        // 6: Summary
   ];
 
@@ -615,13 +586,13 @@ export default function SessionResultsPage({
             <OrangeCatMascot emotion={stepEmotions[step]} className="w-16 h-16 md:w-20 md:h-20" />
           </div>
           <div className="w-full">
-            {step === 0 && <EvaluationStep data={evaluation.data} />}
+            {step === 0 && <EvaluationStep data={evaluation.data} transcript={transcript.data ?? []} />}
             {step === 1 && <StrengthsStep data={evaluation.data} />}
             {step === 4 && (
               learningPlan.isError ? (
                 <ErrorState title="learning plan" error={learningPlan.error} onRetry={() => learningPlan.refetch()} />
               ) : learningPlan.data ? (
-                <LearningPlanStep data={learningPlan.data} />
+                <LearningPlanStep data={learningPlan.data} passingScore={getPassingThreshold(evaluation.data)} />
               ) : (
                 <p className="text-sm text-muted-foreground text-center py-8">Learning plan not available yet.</p>
               )
@@ -650,12 +621,12 @@ export default function SessionResultsPage({
               coaching.isError ? (
                 <ErrorState title="coaching report" error={coaching.error} onRetry={() => coaching.refetch()} />
               ) : coaching.data ? (
-                <CoachingStep data={coaching.data} />
+                <CoachingStep data={coaching.data} evaluation={evaluation.data} />
               ) : (
                 <p className="text-sm text-muted-foreground text-center py-8">Coaching data not available yet.</p>
               )
             )}
-            {step === 6 && <SummaryStep sessionId={id} data={evaluation.data} coaching={coaching.data ?? null} learningPlan={learningPlan.data ?? null} />}
+            {step === 6 && <SummaryStep data={evaluation.data} coaching={coaching.data ?? null} learningPlan={learningPlan.data ?? null} />}
           </div>
         </>
       )}

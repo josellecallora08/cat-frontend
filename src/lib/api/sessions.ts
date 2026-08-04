@@ -13,10 +13,15 @@ export type SessionStatus =
 export interface SessionResponse {
   id: string;
   scenario_id: string;
+  campaign_id?: string | null;
   persona: PersonaSummary | null;
   status: SessionStatus;
   created_at: string;
   ended_at: string | null;
+  standard_id?: string | null;
+  standard_version_id?: string | null;
+  standard_version_number?: number | null;
+  standard_name?: string | null;
 }
 
 export interface TranscriptEntry {
@@ -33,6 +38,69 @@ export interface CompetencyScore {
   weaknesses: { description: string; category: string; transcript_excerpt: string }[];
 }
 
+export interface RubricEvidence {
+  sequence_number: number;
+  speaker: "agent" | "debtor";
+  excerpt: string;
+  explanation: string;
+}
+
+export interface RubricStrength {
+  criterion_id: string;
+  explanation: string;
+  evidence_sequence_numbers: number[];
+}
+
+export interface RubricViolation {
+  violation_id: string;
+  explanation: string;
+  evidence_sequence_numbers: number[];
+}
+
+export interface RubricRecommendationInput {
+  criterion_id: string;
+  transcript_sequence_number: number;
+  need: string;
+}
+
+export interface RubricCategoryScore {
+  rubric_block_id: string;
+  category: string;
+  raw_score: number | null;
+  penalty_total: number;
+  penalized_score: number | null;
+  weight: number;
+  weighted_contribution: number;
+  passing_score: number;
+  passed: boolean;
+  evidence: RubricEvidence[];
+  strengths: RubricStrength[];
+  violations: RubricViolation[];
+  failed_criteria: string[];
+  recommendation_inputs: RubricRecommendationInput[];
+}
+
+export interface RubricRecommendation {
+  rubric_block_id: string;
+  criterion_id: string;
+  evidence_sequence_number: number;
+  explanation: string;
+  recommended_response: string;
+  coaching_advice: string;
+}
+
+export interface CanonicalEvaluationResult {
+  status: "evaluated" | "not_applicable";
+  summary: string;
+  categories: RubricCategoryScore[];
+  weighted_total: number;
+  passing_score: number;
+  passed: boolean;
+  applied_techniques: { techniques_used: unknown[]; reason_if_empty: string };
+  missed_opportunities: { missed_techniques: unknown[]; reason_if_empty: string };
+  recommendations: RubricRecommendation[];
+}
+
 export interface EvaluationResult {
   session_id: string;
   category_scores: CompetencyScore[];
@@ -40,6 +108,14 @@ export interface EvaluationResult {
   strengths: { description: string; category: string; transcript_excerpt: string }[];
   weaknesses: { description: string; category: string; transcript_excerpt: string }[];
   is_too_short: boolean;
+  negotiation_standard_version_id?: string | null;
+  standard_name?: string | null;
+  standard_version_number?: number | null;
+  weighted_total?: number | null;
+  passing_score?: number | null;
+  passed?: boolean | null;
+  standard_snapshot?: Record<string, unknown> | null;
+  rubric_result?: CanonicalEvaluationResult | null;
 }
 
 export interface MistakeItem {
@@ -55,18 +131,24 @@ export interface CoachingReport {
   mistakes_by_category: Record<string, MistakeItem[]>;
   total_mistakes: number;
   no_mistakes: boolean;
+  rubric_recommendations?: RubricRecommendation[];
+  rubric_recommendations_by_block?: Record<string, RubricRecommendation[]>;
 }
 
 export interface LearningPlanItem {
   category: string;
   score: number;
   recommended_scenario: string;
+  rubric_block_id?: string | null;
+  criterion_id?: string | null;
+  practice_focus?: string | null;
 }
 
 export interface LearningPlan {
   session_id: string;
   weak_competencies: LearningPlanItem[];
   all_passing: boolean;
+  standard_version_id?: string | null;
 }
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
@@ -116,6 +198,17 @@ export async function fetchTranscript(sessionId: string): Promise<TranscriptEntr
   return response.json();
 }
 
+function parseEvaluationResult(payload: unknown): EvaluationResult {
+  if (typeof payload !== "object" || payload === null) {
+    throw new Error("Evaluation response has an invalid shape");
+  }
+  const record = payload as Record<string, unknown>;
+  if (typeof record.session_id !== "string" || !Array.isArray(record.category_scores) || typeof record.overall_score !== "number") {
+    throw new Error("Evaluation response has an invalid shape");
+  }
+  return payload as EvaluationResult;
+}
+
 export async function fetchEvaluation(sessionId: string): Promise<EvaluationResult> {
   const response = await fetch(`${API_BASE_URL}/api/sessions/${sessionId}/evaluation`);
 
@@ -123,7 +216,7 @@ export async function fetchEvaluation(sessionId: string): Promise<EvaluationResu
     throw new Error(`Failed to fetch evaluation: ${response.status}`);
   }
 
-  return response.json();
+  return parseEvaluationResult(await response.json());
 }
 
 export async function fetchCoaching(sessionId: string): Promise<CoachingReport> {
