@@ -80,7 +80,12 @@ function getPassingThreshold(data: EvaluationResult): number {
   return data.passing_score ?? LEGACY_PASS_THRESHOLD;
 }
 
+function isEvaluationNotApplicable(data: EvaluationResult): boolean {
+  return data.rubric_result?.status === "not_applicable";
+}
+
 function isEvaluationPassing(data: EvaluationResult): boolean {
+  if (isEvaluationNotApplicable(data)) return false;
   return data.passed ?? getOverallScore(data) >= getPassingThreshold(data);
 }
 
@@ -133,7 +138,7 @@ function StepNav({
     <div className="flex items-center justify-between">
       {currentStep === 0 ? (
         <Link href="/sessions">
-          <Button variant="outline" size="sm" className="gap-1.5">
+          <Button variant="outline" size="sm" className="min-h-11 gap-1.5">
             <ArrowLeft className="h-4 w-4" />
             All Sessions
           </Button>
@@ -143,7 +148,7 @@ function StepNav({
           variant="outline"
           size="sm"
           onClick={onPrev}
-          className="gap-1.5"
+          className="min-h-11 gap-1.5"
         >
           <ArrowLeft className="h-4 w-4" />
           Back
@@ -153,16 +158,20 @@ function StepNav({
         {Array.from({ length: totalSteps }).map((_, i) => (
           <button
             key={i}
+            type="button"
             onClick={() => onStepClick(i)}
-            className={cn(
-              "h-2 rounded-full transition-all duration-300",
-              i === currentStep ? "w-6 bg-[#8F6AE0]" : "w-2 bg-[#8F6AE0]/20 hover:bg-[#8F6AE0]/40"
-            )}
+            className="flex min-h-11 min-w-11 items-center justify-center rounded-full px-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             aria-label={`Go to step ${i + 1}`}
-          />
+            aria-current={i === currentStep ? "step" : undefined}
+          >
+            <span className={cn(
+              "block rounded-full transition-all duration-300 motion-reduce:transition-none",
+              i === currentStep ? "h-2 w-6 bg-[#8F6AE0]" : "h-2 w-2 bg-[#8F6AE0]/20 hover:bg-[#8F6AE0]/40"
+            )} />
+          </button>
         ))}
       </div>
-      <Button size="sm" onClick={onNext} className="gap-1.5">
+      <Button size="sm" onClick={onNext} className="min-h-11 gap-1.5">
         {nextLabel ?? "Next"}
         <ArrowRight className="h-4 w-4" />
       </Button>
@@ -258,7 +267,10 @@ function WeaknessesStep({ data }: { data: EvaluationResult }) {
 }
 
 // --- Step 4: Coaching report ---
-function CoachingStep({ data, evaluation }: { data: CoachingReport; evaluation: EvaluationResult }) {
+function CoachingStep({ data, evaluation, notApplicable }: { data: CoachingReport; evaluation: EvaluationResult; notApplicable: boolean }) {
+  if (notApplicable) {
+    return <div role="status" className="rounded-xl border border-[#F59E0B]/30 bg-[#F59E0B]/5 p-5 text-sm text-muted-foreground">Coaching is not applicable because the transcript was insufficient for a reliable evaluation.</div>;
+  }
   const recommendations = evaluation.rubric_result?.recommendations ?? data.rubric_recommendations ?? [];
   if (data.no_mistakes && recommendations.length === 0) {
     return (
@@ -278,7 +290,10 @@ function CoachingStep({ data, evaluation }: { data: CoachingReport; evaluation: 
 }
 
 // --- Step 5: Learning plan ---
-function LearningPlanStep({ data, passingScore }: { data: LearningPlan; passingScore: number }) {
+function LearningPlanStep({ data, passingScore, notApplicable }: { data: LearningPlan; passingScore: number; notApplicable: boolean }) {
+  if (notApplicable) {
+    return <div role="status" className="rounded-xl border border-[#F59E0B]/30 bg-[#F59E0B]/5 p-5 text-sm text-muted-foreground">No practice plan was generated because this evaluation was not applicable.</div>;
+  }
   if (data.all_passing) {
     return (
       <div className="space-y-4">
@@ -334,6 +349,7 @@ function LearningPlanStep({ data, passingScore }: { data: LearningPlan; passingS
 
 // --- Step 6: Overall score ---
 function OverallScoreStep({ data }: { data: EvaluationResult }) {
+  const notApplicable = isEvaluationNotApplicable(data);
   const overall = getOverallScore(data);
   const threshold = getPassingThreshold(data);
   const passing = data.rubric_result?.categories.filter((category) => category.passed).length ?? data.category_scores.filter((c) => c.score >= threshold).length;
@@ -342,18 +358,20 @@ function OverallScoreStep({ data }: { data: EvaluationResult }) {
   const hasFired = useRef(false);
 
   useEffect(() => {
-    if (passed && !hasFired.current) {
-      hasFired.current = true;
-      // Fire confetti from both sides
-      const end = Date.now() + 1500;
-      const colors = ["#8F6AE0", "#22C55E", "#F59E0B", "#fff200"];
-      (function frame() {
-        confetti({ particleCount: 3, angle: 60, spread: 55, origin: { x: 0, y: 0.6 }, colors });
-        confetti({ particleCount: 3, angle: 120, spread: 55, origin: { x: 1, y: 0.6 }, colors });
-        if (Date.now() < end) requestAnimationFrame(frame);
-      })();
-    }
-  }, [overall, passed]);
+    if (notApplicable || !passed || hasFired.current || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    hasFired.current = true;
+    const end = Date.now() + 1500;
+    const colors = ["#8F6AE0", "#22C55E", "#F59E0B", "#fff200"];
+    (function frame() {
+      confetti({ particleCount: 3, angle: 60, spread: 55, origin: { x: 0, y: 0.6 }, colors });
+      confetti({ particleCount: 3, angle: 120, spread: 55, origin: { x: 1, y: 0.6 }, colors });
+      if (Date.now() < end) requestAnimationFrame(frame);
+    })();
+  }, [notApplicable, passed]);
+
+  if (notApplicable) {
+    return <div role="status" className="space-y-3 rounded-xl border border-[#F59E0B]/30 bg-[#F59E0B]/5 p-5 text-sm text-muted-foreground"><p className="text-base font-semibold text-foreground">Evaluation not applicable</p><p>The transcript did not contain enough reliable evidence to calculate a score. No pass/fail result or remediation is assigned.</p></div>;
+  }
 
   return (
     <div className="space-y-6 text-center">
@@ -391,6 +409,9 @@ function OverallScoreStep({ data }: { data: EvaluationResult }) {
 
 // --- Step 7: Full summary — bento grid layout ---
 function SummaryStep({ data, coaching, learningPlan }: { data: EvaluationResult; coaching: CoachingReport | null; learningPlan: LearningPlan | null }) {
+  if (isEvaluationNotApplicable(data)) {
+    return <div role="status" className="mx-auto max-w-lg rounded-xl border border-[#F59E0B]/30 bg-[#F59E0B]/5 p-5 text-sm text-muted-foreground"><p className="text-base font-semibold text-foreground">Evaluation not applicable</p><p className="mt-2">This session did not produce enough reliable evidence for a score, coaching remediation, or practice plan.</p></div>;
+  }
   const overall = getOverallScore(data);
   const threshold = getPassingThreshold(data);
   const passing = data.rubric_result?.categories.filter((category) => category.passed).length ?? data.category_scores.filter((c) => c.score >= threshold).length;
@@ -502,6 +523,10 @@ function SummaryStep({ data, coaching, learningPlan }: { data: EvaluationResult;
   );
 }
 
+function ArtifactLoading({ label }: { label: string }) {
+  return <div role="status" className="rounded-xl border border-border bg-card p-5 text-center text-sm text-muted-foreground">Loading {label}…</div>;
+}
+
 // --- Error state ---
 function ErrorState({ title, error, onRetry }: { title: string; error: Error | null; onRetry: () => void }) {
   return (
@@ -528,13 +553,16 @@ export default function SessionResultsPage({
   const coaching = useCoaching(id);
   const learningPlan = useLearningPlan(id);
   const [step, setStep] = useState(0);
+  const stepContentRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    stepContentRef.current?.focus();
+  }, [step]);
 
   const TOTAL_STEPS = 7;
 
-  // Show cat loading while any data is still loading
-  const isLoading = evaluation.isLoading || transcript.isLoading || coaching.isLoading || learningPlan.isLoading;
-
-  if (isLoading) {
+  // Evaluation is the primary artifact; other panels render independently as they arrive.
+  if (evaluation.isLoading) {
     return <CatLoading />;
   }
 
@@ -557,7 +585,7 @@ export default function SessionResultsPage({
     "worried",      // 2: Weaknesses
     "thinking",     // 3: Coaching
     "encouraging",  // 4: Learning plan
-    getOverallScore(evaluation.data) >= getPassingThreshold(evaluation.data) ? "celebrating" : "encouraging", // 5: Overall score
+    isEvaluationNotApplicable(evaluation.data) ? "neutral" : getOverallScore(evaluation.data) >= getPassingThreshold(evaluation.data) ? "celebrating" : "encouraging", // 5: Overall score
     "proud",        // 6: Summary
   ];
 
@@ -567,7 +595,7 @@ export default function SessionResultsPage({
     { title: "Strengths", description: "What you did well in this session" },
     { title: "Areas for Improvement", description: "Opportunities to grow" },
     { title: "Coaching Report", description: "Detailed feedback on mistakes" },
-    { title: "Learning Plan", description: "Recommended practice scenarios" },
+    { title: "Learning Plan", description: "Criterion-specific practice focus" },
     { title: "Overall Score", description: "Your final performance rating" },
     { title: "Session Complete", description: "Full performance breakdown" },
   ];
@@ -576,15 +604,18 @@ export default function SessionResultsPage({
   const isCompactStep = step === 0 || step === 1 || step === 4 || step === 5;
 
   return (
-    <div className="flex flex-col h-screen py-6 px-4 overflow-hidden">
+    <div className="flex min-h-screen flex-col overflow-x-hidden px-4 py-6">
       {isCompactStep ? (
         /* Compact steps: everything in one vertically-centered div */
         <div
           key={step}
           className={cn(
-            "flex-1 flex flex-col justify-center items-center animate-in fade-in-0 slide-in-from-right-4 duration-300 w-full",
+            "min-h-0 flex-1 overflow-y-auto flex flex-col justify-start py-2 items-center motion-safe:animate-in motion-safe:fade-in-0 motion-safe:slide-in-from-right-4 motion-safe:duration-300 w-full",
             step < 6 && "max-w-lg mx-auto"
           )}
+          ref={stepContentRef}
+          tabIndex={-1}
+          aria-live="polite"
         >
           <h2 className="text-xl md:text-2xl font-bold text-foreground text-center">
             {stepMeta[step].title}
@@ -596,16 +627,21 @@ export default function SessionResultsPage({
             <OrangeCatMascot emotion={stepEmotions[step]} className="w-16 h-16 md:w-20 md:h-20" />
           </div>
           <div className="w-full">
-            {step === 0 && <EvaluationStep data={evaluation.data} transcript={transcript.data ?? []} />}
+            {step === 0 && (
+              transcript.isLoading ? <ArtifactLoading label="transcript" />
+                : transcript.isError ? <ErrorState title="transcript" error={transcript.error} onRetry={() => transcript.refetch()} />
+                  : <EvaluationStep data={evaluation.data} transcript={transcript.data ?? []} />
+            )}
             {step === 1 && <StrengthsStep data={evaluation.data} />}
             {step === 4 && (
-              learningPlan.isError ? (
-                <ErrorState title="learning plan" error={learningPlan.error} onRetry={() => learningPlan.refetch()} />
-              ) : learningPlan.data ? (
-                <LearningPlanStep data={learningPlan.data} passingScore={getPassingThreshold(evaluation.data)} />
-              ) : (
-                <p className="text-sm text-muted-foreground text-center py-8">Learning plan not available yet.</p>
-              )
+              learningPlan.isLoading ? <ArtifactLoading label="learning plan" />
+                : learningPlan.isError ? (
+                  <ErrorState title="learning plan" error={learningPlan.error} onRetry={() => learningPlan.refetch()} />
+                ) : learningPlan.data ? (
+                  <LearningPlanStep data={learningPlan.data} passingScore={getPassingThreshold(evaluation.data)} notApplicable={isEvaluationNotApplicable(evaluation.data)} />
+                ) : (
+                  <p className="text-sm text-muted-foreground text-center py-8">Learning plan not available yet.</p>
+                )
             )}
             {step === 5 && <OverallScoreStep data={evaluation.data} />}
           </div>
@@ -624,17 +660,21 @@ export default function SessionResultsPage({
           </div>
           <div
             key={step}
-            className="flex-1 overflow-y-auto animate-in fade-in-0 slide-in-from-right-4 duration-300 w-full max-w-lg mx-auto"
+            ref={stepContentRef}
+            tabIndex={-1}
+            aria-live="polite"
+            className="min-h-0 flex-1 overflow-y-auto motion-safe:animate-in motion-safe:fade-in-0 motion-safe:slide-in-from-right-4 motion-safe:duration-300 w-full max-w-lg mx-auto focus-visible:outline-none"
           >
             {step === 2 && <WeaknessesStep data={evaluation.data} />}
             {step === 3 && (
-              coaching.isError ? (
-                <ErrorState title="coaching report" error={coaching.error} onRetry={() => coaching.refetch()} />
-              ) : coaching.data ? (
-                <CoachingStep data={coaching.data} evaluation={evaluation.data} />
-              ) : (
-                <p className="text-sm text-muted-foreground text-center py-8">Coaching data not available yet.</p>
-              )
+              coaching.isLoading ? <ArtifactLoading label="coaching report" />
+                : coaching.isError ? (
+                  <ErrorState title="coaching report" error={coaching.error} onRetry={() => coaching.refetch()} />
+                ) : coaching.data ? (
+                  <CoachingStep data={coaching.data} evaluation={evaluation.data} notApplicable={isEvaluationNotApplicable(evaluation.data)} />
+                ) : (
+                  <p className="text-sm text-muted-foreground text-center py-8">Coaching data not available yet.</p>
+                )
             )}
             {step === 6 && <SummaryStep data={evaluation.data} coaching={coaching.data ?? null} learningPlan={learningPlan.data ?? null} />}
           </div>

@@ -27,6 +27,8 @@ const recommendation: RubricRecommendation = {
   rubric_block_id: "compliance",
   criterion_id: "options",
   evidence_sequence_number: 4,
+  source_speaker: "agent",
+  source_excerpt: "I can offer an arrangement.",
   explanation: "The response could acknowledge the concern first.",
   recommended_response: "I understand the concern; let us review the available options.",
   coaching_advice: "Pair the option with an empathy statement.",
@@ -53,6 +55,8 @@ describe("rubric result components", () => {
 
     expect(screen.getByText(recommendation.recommended_response)).toBeInTheDocument();
     expect(screen.getByText(/transcript sequence 4/i)).toBeInTheDocument();
+    expect(screen.getByText(/source speaker: agent/i)).toBeInTheDocument();
+    expect(screen.getByText(/“i can offer an arrangement\.”/i)).toBeInTheDocument();
     expect(document.querySelector("[dangerouslySetInnerHTML]")).not.toBeInTheDocument();
   });
 
@@ -63,4 +67,25 @@ describe("rubric result components", () => {
     expect(screen.getByText(/no transcript evidence/i)).toBeInTheDocument();
     expect(screen.getAllByText("Not applicable").length).toBeGreaterThan(0);
   });
+
+  it("groups recommendations by rubric category and discloses long lists", async () => {
+    const user = userEvent.setup();
+    const recommendations = Array.from({ length: 4 }, (_, index) => ({
+      ...recommendation,
+      rubric_block_id: index < 2 ? "compliance" : "resolution",
+      block_name: index < 2 ? "Compliance" : "Resolution",
+      criterion_id: `criterion-${index}`,
+      evidence_sequence_number: index + 1,
+    }));
+
+    render(<RecommendationPanel recommendations={recommendations} />);
+
+    expect(screen.getByRole("heading", { name: "Compliance" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Resolution" })).toBeInTheDocument();
+    const toggle = screen.getByRole("button", { name: /show all recommendations/i });
+    expect(screen.getAllByText(/try instead:/i)).toHaveLength(3);
+    await user.click(toggle);
+    expect(screen.getAllByText(/try instead:/i)).toHaveLength(4);
+  });
+
 });
