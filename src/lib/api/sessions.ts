@@ -82,11 +82,29 @@ export interface RubricCategoryScore {
 
 export interface RubricRecommendation {
   rubric_block_id: string;
+  block_name?: string | null;
   criterion_id: string;
+  criterion_name?: string | null;
+  display_order?: number | null;
   evidence_sequence_number: number;
   explanation: string;
   recommended_response: string;
   coaching_advice: string;
+  standard_version_id?: string | null;
+  standard_version_number?: number | null;
+}
+
+export interface RubricCoachingBlock {
+  rubric_block_id: string;
+  block_name: string;
+  display_order: number;
+  recommendations: RubricRecommendation[];
+}
+
+export interface RubricCoaching {
+  standard_version_id?: string | null;
+  standard_version_number?: number | null;
+  blocks: RubricCoachingBlock[];
 }
 
 export interface CanonicalEvaluationResult {
@@ -131,6 +149,7 @@ export interface CoachingReport {
   mistakes_by_category: Record<string, MistakeItem[]>;
   total_mistakes: number;
   no_mistakes: boolean;
+  rubric_coaching?: RubricCoaching | null;
   rubric_recommendations?: RubricRecommendation[];
   rubric_recommendations_by_block?: Record<string, RubricRecommendation[]>;
 }
