@@ -157,7 +157,8 @@ export interface CoachingReport {
 export interface LearningPlanItem {
   category: string;
   score: number;
-  recommended_scenario: string;
+  recommended_scenario?: string | null;
+  scenario_id?: string | null;
   rubric_block_id?: string | null;
   criterion_id?: string | null;
   practice_focus?: string | null;

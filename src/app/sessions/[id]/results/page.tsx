@@ -298,7 +298,7 @@ function LearningPlanStep({ data, passingScore }: { data: LearningPlan; passingS
       <ul className="space-y-3">
         {data.weak_competencies.map((item: LearningPlanItem) => (
           <li
-            key={item.category}
+            key={`${item.rubric_block_id ?? item.category}-${item.criterion_id ?? "category"}`}
             className="flex items-center justify-between gap-3 rounded-xl border border-border p-4"
           >
             <div className="min-w-0 space-y-1">
@@ -306,15 +306,25 @@ function LearningPlanStep({ data, passingScore }: { data: LearningPlan; passingS
                 {formatCategoryLabel(item.category)}
               </p>
               <p className="text-xs text-muted-foreground">
-                Scored {item.score}/100 · below passing ({passingScore})
+                Scored {item.score}/100 · passing threshold ({passingScore})
               </p>
+              <p className="text-xs text-foreground">
+                {item.practice_focus ?? item.recommended_scenario ?? "Practice this competency."}
+              </p>
+              {item.recommended_scenario && (
+                <p className="text-xs text-muted-foreground">
+                  Scenario: {item.recommended_scenario}
+                </p>
+              )}
             </div>
-            <Link href={`/?recommended=${encodeURIComponent(item.recommended_scenario)}`}>
-              <Button variant="outline" size="sm">
-                Practice
-                <ArrowRight className="h-4 w-4" />
-              </Button>
-            </Link>
+            {item.scenario_id && (
+              <Link href={`/sessions/new?scenario_id=${encodeURIComponent(item.scenario_id)}`}>
+                <Button variant="outline" size="sm">
+                  Practice
+                  <ArrowRight className="h-4 w-4" />
+                </Button>
+              </Link>
+            )}
           </li>
         ))}
       </ul>
@@ -459,10 +469,10 @@ function SummaryStep({ data, coaching, learningPlan }: { data: EvaluationResult;
         {learningPlan && !learningPlan.all_passing && (
           <div className="col-span-1 rounded-2xl bg-card border border-border p-4 space-y-2">
             <p className="text-sm font-bold text-foreground">Practice</p>
-            <p className="text-xs text-muted-foreground">Recommended scenarios</p>
+            <p className="text-xs text-muted-foreground">Practice focus</p>
             <ul className="space-y-1 mt-1">
               {learningPlan.weak_competencies.slice(0, 3).map((item: LearningPlanItem) => (
-                <li key={item.category} className="text-xs text-muted-foreground truncate">
+                <li key={`${item.rubric_block_id ?? item.category}-${item.criterion_id ?? "category"}`} className="text-xs text-muted-foreground truncate">
                   • {formatCategoryLabel(item.category)}
                 </li>
               ))}
