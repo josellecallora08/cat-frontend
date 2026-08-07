@@ -216,3 +216,88 @@ describe("TASK-070 results page states and accessibility", () => {
     expect(mocks.confetti).not.toHaveBeenCalled();
   });
 });
+
+
+describe("unsafe and partial result-state exploration", () => {
+  it("does not expose raw artifact error details", async () => {
+    mocks.evaluation.data = canonicalEvaluation;
+    mocks.coaching.isError = true;
+    mocks.coaching.error = new Error("database stack trace and campaign owner secret");
+    renderPage();
+    await waitForResultsHeading();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Go to step 4" }));
+    await waitForResultsHeading("Coaching Report");
+
+    expect(screen.queryByText(/database stack trace|campaign owner secret/i)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /try again/i })).toBeInTheDocument();
+  });
+
+  it("suppresses legacy coaching when canonical recommendations are present", async () => {
+    mocks.evaluation.data = {
+      ...canonicalEvaluation,
+      rubric_result: {
+        ...canonicalEvaluation.rubric_result,
+        recommendations: [{
+          rubric_block_id: "custom-block", criterion_id: "criterion", evidence_sequence_number: 2,
+          explanation: "Canonical explanation", recommended_response: "Canonical response", coaching_advice: "Canonical advice",
+        }],
+      },
+    };
+    mocks.coaching.data = {
+      session_id: "session-1",
+      mistakes_by_category: { compliance: [{
+        transcript_position: 2, transcript_excerpt: "legacy", category: "compliance",
+        explanation: "Legacy duplicate", recommended_alternative: "Legacy alternative",
+      }] },
+      total_mistakes: 1,
+      no_mistakes: false,
+    };
+    renderPage();
+    await waitForResultsHeading();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Go to step 4" }));
+    await waitForResultsHeading("Coaching Report");
+
+    expect(screen.getByText("Canonical response")).toBeInTheDocument();
+    expect(screen.queryByText("Legacy duplicate")).not.toBeInTheDocument();
+    expect(screen.queryByText("Legacy alternative")).not.toBeInTheDocument();
+  });
+
+  it("does not show Practice for an invalid scenario reference", async () => {
+    mocks.evaluation.data = canonicalEvaluation;
+    mocks.learningPlan.data = {
+      session_id: "session-1", all_passing: false,
+      weak_competencies: [{ category: "Custom", score: 40, scenario_id: "unresolved-scenario", practice_focus: "Review criterion" }],
+    };
+    renderPage();
+    await waitForResultsHeading();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Go to step 5" }));
+    await waitForResultsHeading("Learning Plan");
+
+    expect(screen.getByText("Review criterion")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /practice/i })).not.toBeInTheDocument();
+  });
+
+  it("preserves an authorized scenario action and existing session navigation", async () => {
+    mocks.evaluation.data = canonicalEvaluation;
+    mocks.learningPlan.data = {
+      session_id: "session-1", all_passing: false,
+      weak_competencies: [{
+        category: "Custom Category", score: 40, rubric_block_id: "custom-block", criterion_id: "offer-plan",
+        scenario_id: "scenario-123", practice_focus: "Practice offering a plan.",
+      }],
+    };
+    renderPage();
+    await waitForResultsHeading();
+
+    expect(screen.getByRole("link", { name: "All Sessions" })).toHaveAttribute("href", "/sessions");
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Go to step 5" }));
+    await waitForResultsHeading("Learning Plan");
+
+    expect(screen.getByText("Practice offering a plan.")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /practice/i })).toHaveAttribute("href", "/sessions/new?scenario_id=scenario-123");
+  });
+});

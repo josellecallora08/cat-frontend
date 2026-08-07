@@ -57,15 +57,18 @@ function SectionHeading({ title, description, count }: { title: string; descript
   );
 }
 
-function CriterionEditor({ criterion, kind, readOnly, onChange, onRemove }: {
+function CriterionEditor({ criterion, kind, readOnly, errors, onChange, onRemove }: {
   criterion: RubricCriterion;
   kind: "behavior" | "violation";
   readOnly: boolean;
+  errors: Record<string, string>;
   onChange: (criterion: RubricCriterion) => void;
   onRemove: () => void;
 }) {
   const update = (field: keyof RubricCriterion, value: string) => onChange({ ...criterion, [field]: value });
   const label = kind === "behavior" ? "Positive behavior" : "Violation";
+  const descriptionErrorId = `${criterion.id}-description-error`;
+  const evidenceErrorId = `${criterion.id}-evidence-error`;
   return (
     <div className="rounded-xl border border-border/70 bg-background p-4 shadow-xs sm:p-5">
       <div className="flex items-start justify-between gap-3">
@@ -79,15 +82,17 @@ function CriterionEditor({ criterion, kind, readOnly, onChange, onRemove }: {
         {!readOnly && <Button type="button" variant="ghost" size="icon" onClick={onRemove} className="min-h-11 min-w-11 shrink-0 text-muted-foreground hover:bg-destructive/10 hover:text-destructive" aria-label={`Remove ${kind}`}><Trash2 className="h-4 w-4" aria-hidden="true" /></Button>}
       </div>
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
-        <Field id={`${criterion.id}-id`} label="Stable ID" value={criterion.id} disabled={readOnly} onChange={(value) => update("id", value)} />
-        <Field id={`${criterion.id}-name`} label="Name" value={criterion.name} disabled={readOnly} onChange={(value) => update("name", value)} />
+        <Field id={`${criterion.id}-id`} label="Stable ID" value={criterion.id} disabled={readOnly} onChange={(value) => update("id", value)} error={errors.id} />
+        <Field id={`${criterion.id}-name`} label="Name" value={criterion.name} disabled={readOnly} onChange={(value) => update("name", value)} error={errors.name} />
       </div>
       <div className="mt-4 grid gap-4 lg:grid-cols-2">
         <label htmlFor={`${criterion.id}-description`} className="block text-xs font-semibold text-foreground">Description
-          <textarea id={`${criterion.id}-description`} value={criterion.description} disabled={readOnly} onChange={(event) => update("description", event.target.value)} rows={3} className="mt-1.5 min-h-11 w-full resize-y rounded-lg border border-input bg-background px-3 py-2 text-sm font-normal text-foreground shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/20 disabled:cursor-not-allowed disabled:bg-muted/50 disabled:opacity-60" />
+          <textarea id={`${criterion.id}-description`} aria-invalid={Boolean(errors.description)} aria-describedby={errors.description ? descriptionErrorId : undefined} value={criterion.description} disabled={readOnly} onChange={(event) => update("description", event.target.value)} rows={3} className={`mt-1.5 min-h-11 w-full resize-y rounded-lg border bg-background px-3 py-2 text-sm font-normal text-foreground shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/20 disabled:cursor-not-allowed disabled:bg-muted/50 disabled:opacity-60 ${errors.description ? "border-destructive/70 focus-visible:border-destructive focus-visible:ring-destructive/20" : "border-input"}`} />
+          {errors.description && <p id={descriptionErrorId} className="mt-1 text-xs text-destructive">{errors.description}</p>}
         </label>
         <label htmlFor={`${criterion.id}-evidence`} className="block text-xs font-semibold text-foreground">Evidence instructions
-          <textarea id={`${criterion.id}-evidence`} value={criterion.evidence_instructions} disabled={readOnly} onChange={(event) => update("evidence_instructions", event.target.value)} rows={3} className="mt-1.5 min-h-11 w-full resize-y rounded-lg border border-input bg-background px-3 py-2 text-sm font-normal text-foreground shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/20 disabled:cursor-not-allowed disabled:bg-muted/50 disabled:opacity-60" />
+          <textarea id={`${criterion.id}-evidence`} aria-invalid={Boolean(errors.evidence_instructions)} aria-describedby={errors.evidence_instructions ? evidenceErrorId : undefined} value={criterion.evidence_instructions} disabled={readOnly} onChange={(event) => update("evidence_instructions", event.target.value)} rows={3} className={`mt-1.5 min-h-11 w-full resize-y rounded-lg border bg-background px-3 py-2 text-sm font-normal text-foreground shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/20 disabled:cursor-not-allowed disabled:bg-muted/50 disabled:opacity-60 ${errors.evidence_instructions ? "border-destructive/70 focus-visible:border-destructive focus-visible:ring-destructive/20" : "border-input"}`} />
+          {errors.evidence_instructions && <p id={evidenceErrorId} className="mt-1 text-xs text-destructive">{errors.evidence_instructions}</p>}
         </label>
       </div>
     </div>
@@ -106,6 +111,13 @@ export function RubricBlockEditor({ block, readOnly = false, errors = {}, onChan
   const updatePenalty = (currentViolationId: string, value: RubricPenalty) => update("penalties", block.penalties.map((item) => item.violation_id === currentViolationId ? value : item));
   const removePenalty = (violationId: string) => update("penalties", block.penalties.filter((item) => item.violation_id !== violationId));
   const availableViolation = block.violations.find((violation) => !block.penalties.some((penalty) => penalty.violation_id === violation.id));
+  const criterionErrors = (collection: "positive_behaviors" | "violations", index: number) => {
+    const prefix = `${collection}.${index}.`;
+    return Object.entries(errors).reduce<Record<string, string>>((result, [path, message]) => {
+      if (path.startsWith(prefix)) result[path.slice(prefix.length)] = message;
+      return result;
+    }, {});
+  };
 
   return (
     <article className="overflow-hidden rounded-2xl border border-border/70 bg-card shadow-sm" aria-labelledby={`block-${block.id}`}>
@@ -142,19 +154,20 @@ export function RubricBlockEditor({ block, readOnly = false, errors = {}, onChan
             <Field id={`${block.id}-passing-score`} label="Passing score" hint="%" type="number" value={block.passing_score} disabled={readOnly} onChange={(value) => update("passing_score", Number(value))} error={errors.passing_score} />
           </div>
           <label htmlFor={`${block.id}-scoring-instructions`} className="mt-4 block text-xs font-semibold text-foreground">Scoring instructions
-            <textarea id={`${block.id}-scoring-instructions`} value={block.scoring_instructions} disabled={readOnly} onChange={(event) => update("scoring_instructions", event.target.value)} rows={3} className="mt-1.5 min-h-11 w-full resize-y rounded-lg border border-input bg-background px-3 py-2 text-sm font-normal text-foreground shadow-xs outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/20 disabled:cursor-not-allowed disabled:bg-muted/50 disabled:opacity-60" placeholder="Explain how this block should be scored." />
+            <textarea id={`${block.id}-scoring-instructions`} aria-invalid={Boolean(errors.scoring_instructions)} aria-describedby={errors.scoring_instructions ? `${block.id}-scoring-instructions-error` : undefined} value={block.scoring_instructions} disabled={readOnly} onChange={(event) => update("scoring_instructions", event.target.value)} rows={3} className={`mt-1.5 min-h-11 w-full resize-y rounded-lg border bg-background px-3 py-2 text-sm font-normal text-foreground shadow-xs outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/20 disabled:cursor-not-allowed disabled:bg-muted/50 disabled:opacity-60 ${errors.scoring_instructions ? "border-destructive/70 focus-visible:border-destructive focus-visible:ring-destructive/20" : "border-input"}`} placeholder="Explain how this block should be scored." />
+            {errors.scoring_instructions && <p id={`${block.id}-scoring-instructions-error`} className="mt-1 text-xs text-destructive">{errors.scoring_instructions}</p>}
           </label>
         </section>
 
         <section className="rounded-xl border border-border/70 bg-card p-4 sm:p-5" aria-labelledby={`behaviors-${block.id}`}>
           <div className="flex flex-wrap items-start justify-between gap-3"><div><h4 id={`behaviors-${block.id}`} className="text-sm font-semibold text-foreground">Positive behaviors</h4><p className="mt-1 text-xs leading-5 text-muted-foreground">Behaviors the evaluator should reward.</p></div><div className="flex items-center gap-2"><span className="rounded-full bg-success-muted px-2.5 py-1 text-xs font-medium text-success">{block.positive_behaviors.length}</span>{!readOnly && <Button type="button" variant="outline" className="min-h-11" onClick={() => update("positive_behaviors", [...block.positive_behaviors, defaultCriterion("behavior", "New behavior")])}><Plus className="h-4 w-4" aria-hidden="true" />Add behavior</Button>}</div></div>
-          <div className="mt-4 space-y-3">{block.positive_behaviors.map((criterion) => <CriterionEditor key={criterion.id} criterion={criterion} kind="behavior" readOnly={readOnly} onChange={(value) => updateBehavior(criterion.id, value)} onRemove={() => update("positive_behaviors", block.positive_behaviors.filter((item) => item.id !== criterion.id))} />)}</div>
+          <div className="mt-4 space-y-3">{block.positive_behaviors.map((criterion, index) => <CriterionEditor key={criterion.id} criterion={criterion} kind="behavior" readOnly={readOnly} errors={criterionErrors("positive_behaviors", index)} onChange={(value) => updateBehavior(criterion.id, value)} onRemove={() => update("positive_behaviors", block.positive_behaviors.filter((item) => item.id !== criterion.id))} />)}</div>
           {block.positive_behaviors.length === 0 && <p className="mt-4 rounded-lg border border-dashed border-border bg-muted/20 px-4 py-3 text-sm text-muted-foreground">No positive behaviors added yet.</p>}
         </section>
 
         <section className="rounded-xl border border-border/70 bg-card p-4 sm:p-5" aria-labelledby={`violations-${block.id}`}>
           <div className="flex flex-wrap items-start justify-between gap-3"><div><h4 id={`violations-${block.id}`} className="text-sm font-semibold text-foreground">Violations</h4><p className="mt-1 text-xs leading-5 text-muted-foreground">Behaviors that should trigger a finding or deduction.</p></div><div className="flex items-center gap-2"><span className="rounded-full bg-destructive/10 px-2.5 py-1 text-xs font-medium text-destructive">{block.violations.length}</span>{!readOnly && <Button type="button" variant="outline" className="min-h-11" onClick={() => update("violations", [...block.violations, defaultCriterion("violation", "New violation")])}><Plus className="h-4 w-4" aria-hidden="true" />Add violation</Button>}</div></div>
-          <div className="mt-4 space-y-3">{block.violations.map((criterion) => <CriterionEditor key={criterion.id} criterion={criterion} kind="violation" readOnly={readOnly} onChange={(value) => updateViolation(criterion.id, value)} onRemove={() => removeViolation(criterion.id)} />)}</div>
+          <div className="mt-4 space-y-3">{block.violations.map((criterion, index) => <CriterionEditor key={criterion.id} criterion={criterion} kind="violation" readOnly={readOnly} errors={criterionErrors("violations", index)} onChange={(value) => updateViolation(criterion.id, value)} onRemove={() => removeViolation(criterion.id)} />)}</div>
           {block.violations.length === 0 && <p className="mt-4 rounded-lg border border-dashed border-border bg-muted/20 px-4 py-3 text-sm text-muted-foreground">No violations added yet.</p>}
         </section>
 
@@ -178,7 +191,8 @@ export function RubricBlockEditor({ block, readOnly = false, errors = {}, onChan
         <section className="rounded-xl border border-border/70 bg-muted/20 p-4 sm:p-5" aria-labelledby={`guidance-${block.id}`}>
           <div><h4 id={`guidance-${block.id}`} className="text-sm font-semibold text-foreground">Recommendation guidance</h4><p className="mt-1 text-xs leading-5 text-muted-foreground">Give the coach practical guidance for this block.</p></div>
           <label htmlFor={`${block.id}-recommendation-guidance`} className="sr-only">Recommendation guidance</label>
-          <textarea id={`${block.id}-recommendation-guidance`} value={block.recommendation_guidance} disabled={readOnly} onChange={(event) => update("recommendation_guidance", event.target.value)} rows={3} className="mt-4 min-h-11 w-full resize-y rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground shadow-xs outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/20 disabled:cursor-not-allowed disabled:bg-muted/50 disabled:opacity-60" placeholder="Explain what a coach should reinforce or practice next." />
+          <textarea id={`${block.id}-recommendation-guidance`} aria-invalid={Boolean(errors.recommendation_guidance)} aria-describedby={errors.recommendation_guidance ? `${block.id}-recommendation-guidance-error` : undefined} value={block.recommendation_guidance} disabled={readOnly} onChange={(event) => update("recommendation_guidance", event.target.value)} rows={3} className={`mt-4 min-h-11 w-full resize-y rounded-lg border bg-background px-3 py-2 text-sm text-foreground shadow-xs outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/20 disabled:cursor-not-allowed disabled:bg-muted/50 disabled:opacity-60 ${errors.recommendation_guidance ? "border-destructive/70 focus-visible:border-destructive focus-visible:ring-destructive/20" : "border-input"}`} placeholder="Explain what a coach should reinforce or practice next." />
+          {errors.recommendation_guidance && <p id={`${block.id}-recommendation-guidance-error`} className="mt-1 text-xs text-destructive">{errors.recommendation_guidance}</p>}
         </section>
       </div>
     </article>

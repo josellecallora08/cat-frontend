@@ -25,6 +25,7 @@ import { RecommendationPanel } from "@/components/results/recommendation-panel";
 import { RubricScoreCard } from "@/components/results/rubric-score-card";
 import type { CatEmotion } from "@/components/results/OrangeCatMascot";
 import confetti from "canvas-confetti";
+import { isValidScenarioId, SessionArtifactError } from "@/lib/api/sessions";
 import type {
   EvaluationResult,
   CoachingReport,
@@ -33,6 +34,7 @@ import type {
   MistakeItem,
   LearningPlanItem,
   TranscriptEntry,
+  RubricRecommendation,
 } from "@/lib/api/sessions";
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -82,6 +84,22 @@ function getPassingThreshold(data: EvaluationResult): number {
 
 function isEvaluationNotApplicable(data: EvaluationResult): boolean {
   return data.rubric_result?.status === "not_applicable";
+}
+
+function getCoachingRecommendations(data: CoachingReport, evaluation: EvaluationResult): RubricRecommendation[] {
+  if (evaluation.rubric_result?.recommendations.length) return evaluation.rubric_result.recommendations;
+  if (data.rubric_coaching?.blocks.length) {
+    return [...data.rubric_coaching.blocks]
+      .sort((left, right) => left.display_order - right.display_order)
+      .flatMap((block) => block.recommendations);
+  }
+  return data.rubric_recommendations ?? [];
+}
+
+function safeArtifactErrorMessage(title: string, error: Error | null): string {
+  if (error instanceof SessionArtifactError) return error.message;
+  if (error?.message && /response has an invalid shape$/i.test(error.message)) return error.message;
+  return `Unable to load the ${title.toLowerCase()}. Please try again.`;
 }
 
 function isEvaluationPassing(data: EvaluationResult): boolean {
@@ -271,7 +289,16 @@ function CoachingStep({ data, evaluation, notApplicable }: { data: CoachingRepor
   if (notApplicable) {
     return <div role="status" className="rounded-xl border border-[#F59E0B]/30 bg-[#F59E0B]/5 p-5 text-sm text-muted-foreground">Coaching is not applicable because the transcript was insufficient for a reliable evaluation.</div>;
   }
-  const recommendations = evaluation.rubric_result?.recommendations ?? data.rubric_recommendations ?? [];
+  const recommendations = getCoachingRecommendations(data, evaluation);
+  const hasCanonicalCoaching = Boolean(
+    evaluation.rubric_result?.recommendations.length
+      || data.rubric_coaching
+      || (data.rubric_recommendations && data.rubric_recommendations.length > 0)
+      || (data.rubric_recommendations_by_block && Object.keys(data.rubric_recommendations_by_block).length > 0),
+  );
+  if (hasCanonicalCoaching) {
+    return <div className="space-y-4"><RecommendationPanel recommendations={recommendations} /></div>;
+  }
   if (data.no_mistakes && recommendations.length === 0) {
     return (
       <div className="space-y-4">
@@ -332,7 +359,7 @@ function LearningPlanStep({ data, passingScore, notApplicable }: { data: Learnin
                 </p>
               )}
             </div>
-            {item.scenario_id && (
+            {item.scenario_id && isValidScenarioId(item.scenario_id) && (
               <Link href={`/sessions/new?scenario_id=${encodeURIComponent(item.scenario_id)}`}>
                 <Button variant="outline" size="sm">
                   Practice
@@ -529,13 +556,14 @@ function ArtifactLoading({ label }: { label: string }) {
 
 // --- Error state ---
 function ErrorState({ title, error, onRetry }: { title: string; error: Error | null; onRetry: () => void }) {
+  const canRetry = !(error instanceof SessionArtifactError) || error.retryable;
   return (
     <div className="flex min-h-[50vh] items-center justify-center">
       <div className="text-center space-y-4">
         <AlertCircle className="mx-auto h-8 w-8 text-[#EF4444]" />
         <h2 className="text-lg font-medium text-foreground">Couldn&apos;t load {title}</h2>
-        <p className="text-sm text-muted-foreground">{error?.message ?? "An unexpected error occurred."}</p>
-        <Button variant="outline" size="sm" onClick={onRetry}>Try again</Button>
+        <p className="text-sm text-muted-foreground">{safeArtifactErrorMessage(title, error)}</p>
+        {canRetry && <Button variant="outline" size="sm" onClick={onRetry}>Try again</Button>}
       </div>
     </div>
   );
@@ -634,14 +662,15 @@ export default function SessionResultsPage({
             )}
             {step === 1 && <StrengthsStep data={evaluation.data} />}
             {step === 4 && (
-              learningPlan.isLoading ? <ArtifactLoading label="learning plan" />
-                : learningPlan.isError ? (
-                  <ErrorState title="learning plan" error={learningPlan.error} onRetry={() => learningPlan.refetch()} />
-                ) : learningPlan.data ? (
-                  <LearningPlanStep data={learningPlan.data} passingScore={getPassingThreshold(evaluation.data)} notApplicable={isEvaluationNotApplicable(evaluation.data)} />
-                ) : (
-                  <p className="text-sm text-muted-foreground text-center py-8">Learning plan not available yet.</p>
-                )
+              isEvaluationNotApplicable(evaluation.data) ? <LearningPlanStep data={learningPlan.data ?? { session_id: id, weak_competencies: [], all_passing: true }} passingScore={getPassingThreshold(evaluation.data)} notApplicable />
+                : learningPlan.isLoading ? <ArtifactLoading label="learning plan" />
+                  : learningPlan.isError ? (
+                    <ErrorState title="learning plan" error={learningPlan.error} onRetry={() => learningPlan.refetch()} />
+                  ) : learningPlan.data ? (
+                    <LearningPlanStep data={learningPlan.data} passingScore={getPassingThreshold(evaluation.data)} notApplicable={false} />
+                  ) : (
+                    <p className="text-sm text-muted-foreground text-center py-8">Learning plan not available yet.</p>
+                  )
             )}
             {step === 5 && <OverallScoreStep data={evaluation.data} />}
           </div>
@@ -667,14 +696,15 @@ export default function SessionResultsPage({
           >
             {step === 2 && <WeaknessesStep data={evaluation.data} />}
             {step === 3 && (
-              coaching.isLoading ? <ArtifactLoading label="coaching report" />
-                : coaching.isError ? (
-                  <ErrorState title="coaching report" error={coaching.error} onRetry={() => coaching.refetch()} />
-                ) : coaching.data ? (
-                  <CoachingStep data={coaching.data} evaluation={evaluation.data} notApplicable={isEvaluationNotApplicable(evaluation.data)} />
-                ) : (
-                  <p className="text-sm text-muted-foreground text-center py-8">Coaching data not available yet.</p>
-                )
+              isEvaluationNotApplicable(evaluation.data) ? <CoachingStep data={coaching.data ?? { session_id: id, mistakes_by_category: {}, total_mistakes: 0, no_mistakes: true }} evaluation={evaluation.data} notApplicable />
+                : coaching.isLoading ? <ArtifactLoading label="coaching report" />
+                  : coaching.isError ? (
+                    <ErrorState title="coaching report" error={coaching.error} onRetry={() => coaching.refetch()} />
+                  ) : coaching.data ? (
+                    <CoachingStep data={coaching.data} evaluation={evaluation.data} notApplicable={false} />
+                  ) : (
+                    <p className="text-sm text-muted-foreground text-center py-8">Coaching data not available yet.</p>
+                  )
             )}
             {step === 6 && <SummaryStep data={evaluation.data} coaching={coaching.data ?? null} learningPlan={learningPlan.data ?? null} />}
           </div>

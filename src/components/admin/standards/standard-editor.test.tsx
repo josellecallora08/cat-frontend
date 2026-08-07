@@ -39,7 +39,7 @@ const content: NegotiationStandardContent = {
       passing_score: 70,
       scoring_instructions: "Use evidence.",
       positive_behaviors: [],
-      violations: [{ id: "late", name: "Late response", description: "", evidence_instructions: "" }],
+      violations: [{ id: "late", name: "Late response", description: "Responds after an avoidable delay.", evidence_instructions: "Cite the delayed response and the surrounding exchange." }],
       penalties: [],
       recommendation_guidance: "Practice the opening.",
       display_order: 0,

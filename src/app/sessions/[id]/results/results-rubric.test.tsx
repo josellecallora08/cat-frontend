@@ -89,3 +89,28 @@ describe("rubric result components", () => {
   });
 
 });
+
+
+describe("recommendation and action boundary exploration", () => {
+  const makeRecommendation = (index: number): RubricRecommendation => ({
+    ...recommendation,
+    criterion_id: `criterion-${index}`,
+    evidence_sequence_number: index,
+  });
+
+  it("does not require disclosure for ten recommendations", () => {
+    render(<RecommendationPanel recommendations={Array.from({ length: 10 }, (_, index) => makeRecommendation(index))} />);
+
+    expect(screen.queryByRole("button", { name: /show all recommendations/i })).not.toBeInTheDocument();
+  });
+
+  it("requires explicit disclosure and keeps all eleven recommendations reachable", async () => {
+    const user = userEvent.setup();
+    render(<RecommendationPanel recommendations={Array.from({ length: 11 }, (_, index) => makeRecommendation(index))} />);
+
+    const toggle = screen.getByRole("button", { name: /show all recommendations/i });
+    expect(screen.getAllByText(/try instead:/i)).toHaveLength(3);
+    await user.click(toggle);
+    expect(screen.getAllByText(/try instead:/i)).toHaveLength(11);
+  });
+});

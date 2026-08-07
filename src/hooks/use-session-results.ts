@@ -5,10 +5,11 @@ import {
   fetchEvaluation,
   fetchLearningPlan,
   fetchTranscript,
+  SessionArtifactError,
 } from "@/lib/api/sessions";
 
 function retryResultQuery(failureCount: number, error: Error) {
-  if (error.message.includes("404")) return false;
+  if (!(error instanceof SessionArtifactError) || !error.retryable) return false;
   return failureCount < 3;
 }
 
