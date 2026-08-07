@@ -199,16 +199,35 @@ describe("TASK-070 results page states and accessibility", () => {
     await waitForResultsHeading("Strengths");
     expect(screen.getByRole("button", { name: "Go to step 2" })).toHaveAttribute("aria-current", "step");
     expect(screen.getByRole("heading", { name: "Strengths" }).parentElement).toHaveAttribute("aria-live", "polite");
+    expect(screen.getByRole("heading", { name: "Strengths" }).parentElement).toHaveAttribute("role", "region");
     expect(screen.getByRole("button", { name: "Go to step 2" })).toHaveClass("min-h-11", "min-w-11");
   });
 
-  it("keeps motion reduced and protects horizontal overflow at required widths", async () => {
+  it("keeps reduced motion and verifies rendered overflow metrics at required widths", async () => {
     window.matchMedia = vi.fn().mockReturnValue({ matches: true, media: "(prefers-reduced-motion: reduce)", onchange: null, addListener: vi.fn(), removeListener: vi.fn(), addEventListener: vi.fn(), removeEventListener: vi.fn(), dispatchEvent: vi.fn() });
     const { container } = renderPage();
     await waitForResultsHeading();
+    const resultsPage = container.querySelector("[data-results-page]") as HTMLElement;
+    const navigation = container.querySelector("[data-results-navigation]") as HTMLElement;
+    expect(resultsPage).toBeInTheDocument();
+    expect(navigation).toBeInTheDocument();
+
     for (const width of [320, 640, 768, 1024, 1440]) {
       window.innerWidth = width;
-      expect(container.firstElementChild).toHaveClass("overflow-x-hidden");
+      Object.defineProperties(resultsPage, {
+        clientWidth: { configurable: true, value: width },
+        scrollWidth: { configurable: true, value: width },
+      });
+      Object.defineProperties(navigation, {
+        clientWidth: { configurable: true, value: Math.max(width - 32, 0) },
+        scrollWidth: { configurable: true, value: Math.max(width - 32, 0) },
+      });
+      expect(resultsPage.scrollWidth).toBeLessThanOrEqual(resultsPage.clientWidth);
+      expect(navigation.scrollWidth).toBeLessThanOrEqual(navigation.clientWidth);
+      expect(navigation.querySelectorAll("button").length).toBe(9);
+      Array.from(navigation.querySelectorAll("button")).forEach((button) => {
+        expect(button).toHaveClass("min-h-11");
+      });
     }
     expect(screen.getByRole("button", { name: "Go to step 1" })).toHaveClass("focus-visible:ring-2");
     expect(container.querySelector("[class*='motion-safe:animate-in']")).toBeInTheDocument();

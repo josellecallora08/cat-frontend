@@ -68,8 +68,7 @@ describe("rubric result components", () => {
     expect(screen.getAllByText("Not applicable").length).toBeGreaterThan(0);
   });
 
-  it("groups recommendations by rubric category and discloses long lists", async () => {
-    const user = userEvent.setup();
+  it("groups recommendations by rubric category and keeps short lists reachable", () => {
     const recommendations = Array.from({ length: 4 }, (_, index) => ({
       ...recommendation,
       rubric_block_id: index < 2 ? "compliance" : "resolution",
@@ -82,10 +81,8 @@ describe("rubric result components", () => {
 
     expect(screen.getByRole("heading", { name: "Compliance" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Resolution" })).toBeInTheDocument();
-    const toggle = screen.getByRole("button", { name: /show all recommendations/i });
-    expect(screen.getAllByText(/try instead:/i)).toHaveLength(3);
-    await user.click(toggle);
     expect(screen.getAllByText(/try instead:/i)).toHaveLength(4);
+    expect(screen.queryByRole("button", { name: /show all recommendations/i })).not.toBeInTheDocument();
   });
 
 });
@@ -98,10 +95,11 @@ describe("recommendation and action boundary exploration", () => {
     evidence_sequence_number: index,
   });
 
-  it("does not require disclosure for ten recommendations", () => {
+  it("does not require disclosure for ten recommendations and keeps them reachable", () => {
     render(<RecommendationPanel recommendations={Array.from({ length: 10 }, (_, index) => makeRecommendation(index))} />);
 
     expect(screen.queryByRole("button", { name: /show all recommendations/i })).not.toBeInTheDocument();
+    expect(screen.getAllByText(/try instead:/i)).toHaveLength(10);
   });
 
   it("requires explicit disclosure and keeps all eleven recommendations reachable", async () => {
@@ -109,6 +107,7 @@ describe("recommendation and action boundary exploration", () => {
     render(<RecommendationPanel recommendations={Array.from({ length: 11 }, (_, index) => makeRecommendation(index))} />);
 
     const toggle = screen.getByRole("button", { name: /show all recommendations/i });
+    expect(toggle).toHaveAttribute("aria-controls");
     expect(screen.getAllByText(/try instead:/i)).toHaveLength(3);
     await user.click(toggle);
     expect(screen.getAllByText(/try instead:/i)).toHaveLength(11);

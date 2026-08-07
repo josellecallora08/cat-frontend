@@ -14,8 +14,8 @@ export function RubricScoreCard({ category, transcript = [] }: RubricScoreCardPr
   const scoreLabel = score === null ? "Not applicable" : `${score}/100`;
 
   return (
-    <article className="min-w-0 space-y-4 rounded-xl border border-border bg-card p-4" aria-labelledby={`rubric-${category.rubric_block_id}`}>
-      <div className="flex flex-wrap items-start justify-between gap-3">
+    <article className="min-w-0 space-y-4 rounded-xl border border-border bg-card p-4 [overflow-wrap:anywhere]" aria-labelledby={`rubric-${category.rubric_block_id}`}>
+      <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
         <div>
           <h3 id={`rubric-${category.rubric_block_id}`} className="text-base font-semibold text-foreground">{category.category}</h3>
           <p className="mt-1 text-xs text-muted-foreground">Block weight {category.weight}% · passing score {category.passing_score}%</p>
@@ -35,9 +35,9 @@ export function RubricScoreCard({ category, transcript = [] }: RubricScoreCardPr
         Calculation: {category.raw_score === null ? "not applicable" : `${category.penalized_score} × ${category.weight}% ÷ 100 = ${category.weighted_contribution.toFixed(2)}`} · Final category score: <strong>{scoreLabel}</strong>
       </p>
 
-      {category.failed_criteria.length > 0 && <div><h4 className="text-sm font-semibold text-foreground">Failed criteria</h4><ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-muted-foreground">{category.failed_criteria.map((criterion) => <li key={criterion}>{criterion}</li>)}</ul></div>}
-      {category.strengths.length > 0 && <div><h4 className="text-sm font-semibold text-foreground">Strengths</h4><ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-muted-foreground">{category.strengths.map((strength) => <li key={`${strength.criterion_id}-${strength.explanation}`}>{strength.explanation}</li>)}</ul></div>}
-      {category.violations.length > 0 && <div><h4 className="text-sm font-semibold text-foreground">Violations</h4><ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-muted-foreground">{category.violations.map((violation) => <li key={`${violation.violation_id}-${violation.explanation}`}>{violation.explanation}</li>)}</ul></div>}
+      {category.failed_criteria.length > 0 && <div><h4 className="text-sm font-semibold text-foreground">Failed criteria</h4><ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-muted-foreground">{category.failed_criteria.map((criterion) => <li key={`${category.rubric_block_id}-${criterion}`}>{criterion}</li>)}</ul></div>}
+      {category.strengths.length > 0 && <div><h4 className="text-sm font-semibold text-foreground">Strengths</h4><ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-muted-foreground">{category.strengths.map((strength) => <li key={`${category.rubric_block_id}-${strength.criterion_id}-${strength.evidence_sequence_numbers.join(",")}`}>{strength.explanation}</li>)}</ul></div>}
+      {category.violations.length > 0 && <div><h4 className="text-sm font-semibold text-foreground">Violations</h4><ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-muted-foreground">{category.violations.map((violation) => <li key={`${category.rubric_block_id}-${violation.violation_id}-${violation.evidence_sequence_numbers.join(",")}`}>{violation.explanation}</li>)}</ul></div>}
       <TranscriptEvidence evidence={category.evidence} transcript={transcript} />
     </article>
   );
