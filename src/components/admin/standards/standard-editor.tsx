@@ -23,7 +23,47 @@ interface StandardEditorProps {
 const emptyContent: NegotiationStandardContent = { schema_version: 1, overall_passing_score: 70, blocks: [] };
 
 function createBlock(displayOrder: number): RubricBlock {
-  return { id: `block-${crypto.randomUUID()}`, category: "New rubric block", weight: 0, passing_score: 70, scoring_instructions: "", positive_behaviors: [], violations: [], penalties: [], recommendation_guidance: "", display_order: displayOrder };
+  return {
+    id: `block-${crypto.randomUUID()}`,
+    category: "New rubric block",
+    weight: 0,
+    passing_score: 70,
+    scoring_instructions: "Score this category using observable evidence from the conversation.",
+    positive_behaviors: [],
+    violations: [],
+    penalties: [],
+    recommendation_guidance: "Reinforce strengths and practice improvements for this category.",
+    display_order: displayOrder,
+  };
+}
+
+function validateRequiredRubricText(content: NegotiationStandardContent): ValidationIssue[] {
+  const errors: ValidationIssue[] = [];
+  const requireText = (value: string, path: string, label: string) => {
+    if (!value.trim()) errors.push({ code: "required", path, message: `${label} is required.` });
+  };
+
+  content.blocks.forEach((block, blockIndex) => {
+    const blockPath = `blocks.${blockIndex}`;
+    requireText(block.id, `${blockPath}.id`, "Stable ID");
+    requireText(block.category, `${blockPath}.category`, "Category");
+    requireText(block.scoring_instructions, `${blockPath}.scoring_instructions`, "Scoring instructions");
+    requireText(block.recommendation_guidance, `${blockPath}.recommendation_guidance`, "Recommendation guidance");
+
+    for (const [collection, items, label] of [
+      ["positive_behaviors", block.positive_behaviors, "Positive behavior"] as const,
+      ["violations", block.violations, "Violation"] as const,
+    ]) {
+      items.forEach((criterion, criterionIndex) => {
+        const criterionPath = `${blockPath}.${collection}.${criterionIndex}`;
+        requireText(criterion.id, `${criterionPath}.id`, `${label} stable ID`);
+        requireText(criterion.name, `${criterionPath}.name`, `${label} name`);
+        requireText(criterion.description, `${criterionPath}.description`, `${label} description`);
+        requireText(criterion.evidence_instructions, `${criterionPath}.evidence_instructions`, `${label} evidence instructions`);
+      });
+    }
+  });
+  return errors;
 }
 
 function moveBlock(blocks: RubricBlock[], id: string, direction: "up" | "down") {
@@ -71,7 +111,7 @@ function StandardEditorForm({ campaignId, standard, isAdmin }: StandardEditorPro
     const prefix = `blocks.${activeIndex}.`;
     return (validation?.errors ?? []).reduce<Record<string, string>>((result, error) => {
       if (error.path.startsWith(prefix)) {
-        const field = error.path.slice(prefix.length).split(/[.[]/)[0];
+        const field = error.path.slice(prefix.length);
         result[field] = error.message;
       }
       return result;
@@ -101,6 +141,12 @@ function StandardEditorForm({ campaignId, standard, isAdmin }: StandardEditorPro
 
   const saveDraft = async () => {
     setNotice(null);
+    const requiredErrors = validateRequiredRubricText(content);
+    if (requiredErrors.length > 0) {
+      setValidation({ valid: false, weight_total: total, errors: requiredErrors });
+      setNotice("Complete all required rubric fields before saving.");
+      return;
+    }
     try {
       if (!standard) {
         await createMutation.mutateAsync({ name: name.trim() || "New negotiation standard", description: description || null, draft_content: content });
