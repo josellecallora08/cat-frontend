@@ -13,7 +13,8 @@ export type SessionStatus =
 export interface SessionResponse {
   id: string;
   scenario_id: string;
-  campaign_id?: string | null;
+  campaign_id: string | null;
+  campaign_name: string | null;
   persona: PersonaSummary | null;
   status: SessionStatus;
   created_at: string;
@@ -190,6 +191,7 @@ export interface LearningPlan {
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
 
+<<<<<<< HEAD
 export type ArtifactErrorCategory =
   | "unauthorized"
   | "forbidden"
@@ -312,6 +314,12 @@ async function requestArtifact<T>(
 }
 
 export async function createSession(scenarioId: string): Promise<SessionResponse> {
+=======
+export async function createSession(
+  scenarioId: string,
+  campaignId?: string,
+): Promise<SessionResponse> {
+>>>>>>> e904fdc92547a3c4311e0627222c20c55c8d99c9
   const token = typeof window !== "undefined" ? localStorage.getItem("cat_token") : null;
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (token) headers["Authorization"] = `Bearer ${token}`;
@@ -319,7 +327,10 @@ export async function createSession(scenarioId: string): Promise<SessionResponse
   const response = await fetch(`${API_BASE_URL}/api/sessions`, {
     method: "POST",
     headers,
-    body: JSON.stringify({ scenario_id: scenarioId }),
+    body: JSON.stringify({
+      scenario_id: scenarioId,
+      ...(campaignId ? { campaign_id: campaignId } : {}),
+    }),
   });
 
   if (!response.ok) {
