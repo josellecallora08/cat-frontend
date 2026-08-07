@@ -1,3 +1,6 @@
+
+import { handleUnauthorized } from "@/lib/api/unauthorized";
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
 
 // --- Types ---
@@ -69,6 +72,7 @@ export async function fetchDashboard(
   const res = await fetch(`${API_BASE_URL}/api/dashboard${params}`, {
     headers,
   });
+  handleUnauthorized(res);
   if (!res.ok) throw new Error("Failed to fetch dashboard");
   return res.json();
 }
@@ -90,6 +94,7 @@ export async function fetchScoreHistory(
     `${API_BASE_URL}/api/dashboard/score-history${params}`,
     { headers }
   );
+  handleUnauthorized(res);
   if (!res.ok) return [];
   return res.json();
 }
@@ -109,6 +114,7 @@ export async function fetchLeaderboard(
   const res = await fetch(`${API_BASE_URL}/api/dashboard/leaderboard`, {
     headers,
   });
+  handleUnauthorized(res);
   if (!res.ok) return [];
   return res.json();
 }
