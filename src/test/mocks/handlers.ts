@@ -28,4 +28,16 @@ export const handlers = [
   http.get("/api/scenarios", () => {
     return HttpResponse.json(mockScenarios);
   }),
+  http.get("/api/sessions/:sessionId/report/export", ({ request, params }) => {
+    const format = new URL(request.url).searchParams.get("format");
+    const extension = format === "csv" || format === "pdf" ? format : "json";
+    const contentType = extension === "pdf" ? "application/pdf" : extension === "csv" ? "text/csv" : "application/json";
+    return new HttpResponse(new Blob([`session report (${extension})`], { type: contentType }), {
+      status: 200,
+      headers: {
+        "Content-Type": contentType,
+        "Content-Disposition": `attachment; filename="session-report_${String(params.sessionId)}.${extension}"`,
+      },
+    });
+  }),
 ];
