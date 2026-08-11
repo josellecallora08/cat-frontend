@@ -167,3 +167,51 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Report views keep keyboard focus visible even when a component supplies its own outline. */
+[data-report-page] :where(button, a[href], [tabindex]:not([tabindex="-1"])):focus-visible {
+  outline: 3px solid var(--ring) !important;
+  outline-offset: 3px;
+}
+
+/* Every report action remains usable at the minimum touch target size. */
+[data-report-page] :where(button, a[href]) {
+  min-block-size: 44px;
+  min-inline-size: 44px;
+}
+
+@media print {
+  /* Keep the report itself, but remove application/navigation chrome and controls. */
+  nav,
+  header[role="banner"],
+  [data-results-navigation],
+  [data-report-chrome],
+  [data-report-navigation],
+  [data-report-download],
+  [data-report-page] button,
+  [data-report-page] a[href^="/sessions"] {
+    display: none !important;
+  }
+
+  html,
+  body {
+    background: white !important;
+    color: black !important;
+    overflow: visible !important;
+  }
+
+  [data-report-page],
+  [data-report-page] * {
+    max-width: none !important;
+    overflow: visible !important;
+    height: auto !important;
+    box-shadow: none !important;
+  }
+
+  [data-report-page] [data-report-section],
+  [data-report-page] [data-report-section] > *,
+  [data-report-page] li {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+}
