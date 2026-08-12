@@ -21,6 +21,7 @@ export interface AuthState {
   user: AuthUser | null;
   token: string | null;
   isLoading: boolean;
+  isHydrated: boolean;
   error: string | null;
 }
 
@@ -37,6 +38,7 @@ const initialState: AuthState = {
   user: null,
   token: null,
   isLoading: false,
+  isHydrated: false,
   error: null,
 };
 
@@ -143,11 +145,14 @@ export const useAuthStore = create<AuthStore>((set) => ({
           sameSite: "Lax",
           maxAge: 86400,
         });
-        set({ user, token });
+        set({ user, token, isHydrated: true });
       } catch {
         localStorage.removeItem("cat_token");
         localStorage.removeItem("cat_user");
+        set({ isHydrated: true });
       }
+      return;
     }
+    set({ isHydrated: true });
   },
 }));

@@ -1,41 +1,44 @@
 "use client";
 
-import { use, useState, useRef, useEffect } from "react";
-import Link from "next/link";
-import {
-  useEvaluation,
-  useCoaching,
-  useLearningPlan,
-  useTranscript,
-} from "@/hooks/use-session-results";
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
-import {
-  CheckCircle2,
-  AlertTriangle,
-  Trophy,
-  ThumbsUp,
-  AlertCircle,
-  ArrowRight,
-  ArrowLeft,
-} from "lucide-react";
 import { CatMascotSvg } from "@/components/auth/CatMascotSvg";
-import { OrangeCatMascot } from "@/components/results/OrangeCatMascot";
-import { RecommendationPanel } from "@/components/results/recommendation-panel";
-import { RubricScoreCard } from "@/components/results/rubric-score-card";
 import type { CatEmotion } from "@/components/results/OrangeCatMascot";
-import confetti from "canvas-confetti";
-import { isValidScenarioId, SessionArtifactError } from "@/lib/api/sessions";
+import { OrangeCatMascot } from "@/components/results/OrangeCatMascot";
+import { PrintReportSection } from "@/components/results/print-report-section";
+import { RecommendationPanel } from "@/components/results/recommendation-panel";
+import { ReportShell } from "@/components/results/report-shell";
+import { RubricScoreCard } from "@/components/results/rubric-score-card";
+import { Button } from "@/components/ui/button";
+import { useReport } from "@/hooks/use-report";
+import {
+    useCoaching,
+    useEvaluation,
+    useLearningPlan,
+    useTranscript,
+} from "@/hooks/use-session-results";
 import type {
-  EvaluationResult,
-  CoachingReport,
-  LearningPlan,
-  CompetencyScore,
-  MistakeItem,
-  LearningPlanItem,
-  TranscriptEntry,
-  RubricRecommendation,
+    CoachingReport,
+    CompetencyScore,
+    EvaluationResult,
+    LearningPlan,
+    LearningPlanItem,
+    MistakeItem,
+    RubricRecommendation,
+    TranscriptEntry,
 } from "@/lib/api/sessions";
+import { isValidScenarioId, SessionArtifactError } from "@/lib/api/sessions";
+import { cn } from "@/lib/utils";
+import confetti from "canvas-confetti";
+import {
+    AlertCircle,
+    AlertTriangle,
+    ArrowLeft,
+    ArrowRight,
+    CheckCircle2,
+    ThumbsUp,
+    Trophy,
+} from "lucide-react";
+import Link from "next/link";
+import { use, useEffect, useRef, useState } from "react";
 
 const CATEGORY_LABELS: Record<string, string> = {
   call_opening: "Call Opening",
@@ -153,12 +156,12 @@ function StepNav({
   nextLabel?: string;
 }) {
   return (
-    <div className="flex items-center justify-between">
+    <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
       {currentStep === 0 ? (
-        <Link href="/sessions">
-          <Button variant="outline" size="sm" className="min-h-11 gap-1.5">
-            <ArrowLeft className="h-4 w-4" />
-            All Sessions
+        <Link href="/sessions" className="max-w-[42%] shrink-0">
+          <Button variant="outline" size="sm" className="min-h-11 max-w-full gap-1.5 px-2 sm:px-3">
+            <ArrowLeft className="h-4 w-4 shrink-0" />
+            <span className="truncate">All Sessions</span>
           </Button>
         </Link>
       ) : (
@@ -166,19 +169,19 @@ function StepNav({
           variant="outline"
           size="sm"
           onClick={onPrev}
-          className="min-h-11 gap-1.5"
+          className="min-h-11 shrink-0 gap-1.5 px-2 sm:px-3"
         >
           <ArrowLeft className="h-4 w-4" />
           Back
         </Button>
       )}
-      <div className="flex items-center gap-1.5">
+      <div className="order-3 flex min-w-0 max-w-full flex-1 items-center justify-center gap-0 overflow-x-auto px-1 sm:order-none sm:gap-1.5">
         {Array.from({ length: totalSteps }).map((_, i) => (
           <button
             key={i}
             type="button"
             onClick={() => onStepClick(i)}
-            className="flex min-h-11 min-w-11 items-center justify-center rounded-full px-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full px-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             aria-label={`Go to step ${i + 1}`}
             aria-current={i === currentStep ? "step" : undefined}
           >
@@ -189,8 +192,8 @@ function StepNav({
           </button>
         ))}
       </div>
-      <Button size="sm" onClick={onNext} className="min-h-11 gap-1.5">
-        {nextLabel ?? "Next"}
+      <Button size="sm" onClick={onNext} className="min-h-11 max-w-[42%] shrink-0 gap-1.5 px-2 sm:px-3">
+        <span className="truncate">{nextLabel ?? "Next"}</span>
         <ArrowRight className="h-4 w-4" />
       </Button>
     </div>
@@ -212,7 +215,7 @@ function EvaluationStep({ data, transcript }: { data: EvaluationResult; transcri
       <StandardContext data={data} />
       {data.is_too_short && <div className="flex items-center gap-3 rounded-xl border border-[#F59E0B]/30 bg-[#F59E0B]/5 px-4 py-3"><AlertTriangle className="h-4 w-4 text-[#F59E0B]" aria-hidden="true" /><p className="text-xs text-muted-foreground text-left">Short session — scores may be less accurate with fewer turns.</p></div>}
       <div className="space-y-4">
-        {data.category_scores.map((item: CompetencyScore) => <div key={item.category} className="space-y-1.5"><div className="flex justify-between text-sm"><span className="font-medium text-foreground">{formatCategoryLabel(item.category)}</span><span className="text-muted-foreground">{item.score}/100{formatWeight(item.category) && ` · ${formatWeight(item.category)}`}</span></div><div className="h-2.5 w-full overflow-hidden rounded-full bg-muted"><div className={cn("h-full rounded-full transition-all", scoreToneBar(item.score))} style={{ width: `${item.score}%` }} /></div></div>)}
+        {data.category_scores.map((item: CompetencyScore) => <div key={item.category} className="space-y-1.5"><div className="flex justify-between text-sm"><span className="font-medium text-foreground">{formatCategoryLabel(item.category)}</span><span className="text-muted-foreground">{item.score}/100{formatWeight(item.category) && ` · ${formatWeight(item.category)}`}</span></div><div className="h-2.5 w-full overflow-hidden rounded-full bg-muted"><div role="img" aria-label={`${formatCategoryLabel(item.category)} score: ${item.score} out of 100`} className={cn("h-full rounded-full transition-all motion-reduce:transition-none", scoreToneBar(item.score))} style={{ width: `${item.score}%` }}><span className="sr-only">{item.score} out of 100</span></div></div></div>)}
       </div>
     </div>
   );
@@ -449,9 +452,9 @@ function SummaryStep({ data, coaching, learningPlan }: { data: EvaluationResult;
     <div className="space-y-4 w-full max-w-2xl mx-auto">
       <StandardContext data={data} />
       {/* Bento grid */}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {/* Overall score — spans full width */}
-        <div className="col-span-2 p-3 text-center">
+        <div className="col-span-2 sm:col-span-2 p-3 text-center">
           <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Overall Score</p>
           <p className={cn("mt-1 text-4xl font-bold leading-none", scoreToneText(overall ?? 0))}>
             {Math.round(overall ?? 0)}<span className="text-base font-medium text-muted-foreground">/100</span>
@@ -464,7 +467,7 @@ function SummaryStep({ data, coaching, learningPlan }: { data: EvaluationResult;
 
         {/* Strengths — spans full width */}
         {data.strengths && data.strengths.length > 0 && (
-          <div className="col-span-2 rounded-2xl bg-[#22C55E]/5 border border-[#22C55E]/20 p-4 space-y-2">
+          <div className="col-span-2 sm:col-span-2 rounded-2xl bg-[#22C55E]/5 border border-[#22C55E]/20 p-4 space-y-2">
             <div className="flex items-center gap-1.5">
               <ThumbsUp className="h-4 w-4 text-[#22C55E]" />
               <p className="text-sm font-bold text-foreground">Strengths</p>
@@ -481,7 +484,7 @@ function SummaryStep({ data, coaching, learningPlan }: { data: EvaluationResult;
 
         {/* Areas for improvement — spans full width */}
         {data.weaknesses && data.weaknesses.length > 0 && (
-          <div className="col-span-2 rounded-2xl bg-[#EF4444]/5 border border-[#EF4444]/20 p-4 space-y-2">
+          <div className="col-span-2 sm:col-span-2 rounded-2xl bg-[#EF4444]/5 border border-[#EF4444]/20 p-4 space-y-2">
             <div className="flex items-center gap-1.5">
               <AlertTriangle className="h-4 w-4 text-[#EF4444]" />
               <p className="text-sm font-bold text-foreground">Needs Work</p>
@@ -530,14 +533,14 @@ function SummaryStep({ data, coaching, learningPlan }: { data: EvaluationResult;
 
         {/* All passing state */}
         {coaching?.no_mistakes && learningPlan?.all_passing && (
-          <div className="col-span-2 rounded-2xl bg-[#22C55E]/5 border border-[#22C55E]/20 p-4 text-center">
+          <div className="col-span-2 sm:col-span-2 rounded-2xl bg-[#22C55E]/5 border border-[#22C55E]/20 p-4 text-center">
             <Trophy className="mx-auto h-5 w-5 text-[#22C55E]" />
             <p className="mt-1 text-sm font-medium text-[#22C55E]">Perfect session — no issues found!</p>
           </div>
         )}
 
         {/* Actions — 2 col */}
-        <div className="col-span-2 grid grid-cols-2 gap-3 pt-1">
+        <div className="col-span-2 sm:col-span-2 grid grid-cols-2 gap-3 pt-1">
           <Link href="/sessions" className="block">
             <Button variant="outline" className="w-full" size="lg">All Sessions</Button>
           </Link>
@@ -580,6 +583,7 @@ export default function SessionResultsPage({
   const transcript = useTranscript(id);
   const coaching = useCoaching(id);
   const learningPlan = useLearningPlan(id);
+  const reportState = useReport(id);
   const [step, setStep] = useState(0);
   const stepContentRef = useRef<HTMLDivElement>(null);
 
@@ -590,12 +594,12 @@ export default function SessionResultsPage({
   const TOTAL_STEPS = 7;
 
   // Evaluation is the primary artifact; other panels render independently as they arrive.
-  if (evaluation.isLoading) {
+  if (evaluation.isLoading && !reportState.report) {
     return <CatLoading />;
   }
 
-  // Show error if evaluation failed (primary data)
-  if (evaluation.isError) {
+  // The aggregate report is authoritative; only fall back to the legacy query when it is unavailable.
+  if (evaluation.isError && !reportState.report) {
     return <ErrorState title="evaluation" error={evaluation.error} onRetry={() => evaluation.refetch()} />;
   }
 
@@ -632,7 +636,12 @@ export default function SessionResultsPage({
   const isCompactStep = step === 0 || step === 1 || step === 4 || step === 5;
 
   return (
-    <div className="flex min-h-screen flex-col overflow-x-hidden px-4 py-6">
+    <ReportShell report={reportState.report} reportError={reportState.metadata.error ?? null} sessionId={id} onRetry={() => { void reportState.retryAll(); }} onRetrySection={(name) => { void reportState.retrySection(name); }}>
+      <div className="report-print-root flex min-h-screen flex-col overflow-x-hidden px-4 py-6">
+      <PrintReportSection
+        className="flex min-h-0 flex-1 flex-col"
+        sectionName={stepMeta[step].title}
+      >
       {isCompactStep ? (
         /* Compact steps: everything in one vertically-centered div */
         <div
@@ -651,7 +660,7 @@ export default function SessionResultsPage({
           <p className="text-sm text-muted-foreground text-center mt-1 mb-3">
             {stepMeta[step].description}
           </p>
-          <div className="flex justify-center mb-3">
+          <div className="screen-only-decoration flex justify-center mb-3">
             <OrangeCatMascot emotion={stepEmotions[step]} className="w-16 h-16 md:w-20 md:h-20" />
           </div>
           <div className="w-full">
@@ -684,7 +693,7 @@ export default function SessionResultsPage({
           <p className="text-sm text-muted-foreground text-center mt-1 mb-3 shrink-0">
             {stepMeta[step].description}
           </p>
-          <div className="flex justify-center mb-3 shrink-0">
+          <div className="screen-only-decoration flex justify-center mb-3 shrink-0">
             <OrangeCatMascot emotion={stepEmotions[step]} className="w-16 h-16 md:w-20 md:h-20" />
           </div>
           <div
@@ -712,6 +721,7 @@ export default function SessionResultsPage({
       )}
 
       {/* Navigation — pinned at bottom */}
+      <div className="screen-only-controls">
       {step < TOTAL_STEPS - 1 && (
         <div className="max-w-lg mx-auto w-full pt-4 shrink-0">
           <StepNav
@@ -724,6 +734,9 @@ export default function SessionResultsPage({
           />
         </div>
       )}
+      </div>
+      </PrintReportSection>
     </div>
+    </ReportShell>
   );
 }
