@@ -94,6 +94,9 @@ function CallPageContent() {
   const [continuousMode, setContinuousMode] = useState(true);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const transcriptEndRef = useRef<HTMLDivElement>(null);
+  const messageInFlightRef = useRef(false);
+  const initializationStartedRef = useRef(false);
+  const listenTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const elapsed = useElapsed(status !== "ended");
 
@@ -103,6 +106,13 @@ function CallPageContent() {
 
   const speakText = useCallback((text: string): Promise<void> => {
     return new Promise(async (resolve) => {
+      let settled = false;
+      const finish = () => {
+        if (settled) return;
+        settled = true;
+        resolve();
+      };
+      const timeout = setTimeout(finish, 15000);
       try {
         const res = await fetch(`${API_BASE_URL}/api/tts`, {
           method: "POST",
@@ -114,20 +124,22 @@ function CallPageContent() {
         const audioUrl = URL.createObjectURL(audioBlob);
         const audio = new Audio(audioUrl);
         audio.onended = () => {
+          clearTimeout(timeout);
           URL.revokeObjectURL(audioUrl);
-          resolve();
+          finish();
         };
         audio.onerror = () => {
+          clearTimeout(timeout);
           URL.revokeObjectURL(audioUrl);
-          resolve();
+          finish();
         };
         await audio.play();
       } catch {
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.lang = "fil-PH";
         utterance.rate = 0.9;
-        utterance.onend = () => resolve();
-        utterance.onerror = () => resolve();
+        utterance.onend = finish;
+        utterance.onerror = finish;
         speechSynthesis.speak(utterance);
       }
     });
@@ -135,13 +147,16 @@ function CallPageContent() {
 
   useEffect(() => {
     if (!sessionId) return;
+    if (initializationStartedRef.current) return;
+    initializationStartedRef.current = true;
     let cancelled = false;
+    const controller = new AbortController();
     async function startCall() {
       setStatus("processing");
       await new Promise((r) => setTimeout(r, 500));
       try {
         // First check if session is still valid
-        const checkRes = await fetch(`${API_BASE_URL}/api/sessions/${sessionId}`);
+        const checkRes = await fetch(`${API_BASE_URL}/api/sessions/${sessionId}`, { signal: controller.signal });
         if (checkRes.ok) {
           const sessionData = await checkRes.json();
           if (sessionData.status === "completed" || sessionData.status === "error") {
@@ -158,6 +173,7 @@ function CallPageContent() {
         const res = await fetch(`${API_BASE_URL}/api/sessions/${sessionId}/message`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          signal: controller.signal,
           body: JSON.stringify({
             text: "[The phone is ringing. You pick up the call.]",
           }),
@@ -177,22 +193,28 @@ function CallPageContent() {
     startCall();
     return () => {
       cancelled = true;
+      controller.abort();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId]);
 
   const sendMessage = useCallback(
     async (text: string) => {
-      if (!sessionId || !text.trim()) return;
+      if (!sessionId || !text.trim() || messageInFlightRef.current) return;
+      messageInFlightRef.current = true;
       setError(null);
       setTranscript((prev) => [...prev, { speaker: "agent", text }]);
       setStatus("processing");
       try {
+        const controller = new AbortController();
+        const requestTimeout = setTimeout(() => controller.abort(), 30000);
         const res = await fetch(`${API_BASE_URL}/api/sessions/${sessionId}/message`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          signal: controller.signal,
           body: JSON.stringify({ text }),
         });
+        clearTimeout(requestTimeout);
         if (!res.ok) throw new Error(`API error: ${res.status}`);
         const data = await res.json();
         setTranscript((prev) => [...prev, { speaker: "debtor", text: data.text }]);
@@ -224,6 +246,8 @@ function CallPageContent() {
       } catch (e) {
         setError(e instanceof Error ? e.message : "Failed to get a response.");
         setStatus("active");
+      } finally {
+        messageInFlightRef.current = false;
       }
     },
     [sessionId, speakText, router]
@@ -249,6 +273,7 @@ function CallPageContent() {
       if (lastResult && lastResult[0]) {
         const text = lastResult[0].transcript.trim();
         if (text) {
+          if (messageInFlightRef.current) return;
           // Pause recognition while processing response
           recognition.stop();
           sendMessage(text);
@@ -268,7 +293,7 @@ function CallPageContent() {
       // Auto-restart if call is still active and in continuous mode
       setStatus((currentStatus) => {
         if (currentStatus === "listening" && continuousMode) {
-          setTimeout(() => {
+          listenTimerRef.current = setTimeout(() => {
             try {
               recognition.start();
             } catch { /* already started or page navigating away */ }
@@ -313,8 +338,11 @@ function CallPageContent() {
       hasStartedListening.current = true;
       if (continuousMode) {
         // Delay first listen to avoid picking up initial TTS
-        setTimeout(() => startListening(), 600);
+        listenTimerRef.current = setTimeout(() => startListening(), 600);
       }
+    return () => {
+      if (listenTimerRef.current) clearTimeout(listenTimerRef.current);
+    };
     }
   }, [status, startListening, continuousMode]);
 
