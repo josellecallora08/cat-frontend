@@ -6,7 +6,7 @@ import { ScriptUploadPanel } from "./script-upload-panel";
 
 describe("ScriptUploadPanel", () => {
   beforeEach(() => {
-    useAuthStore.setState({ token: "admin-token" });
+    useAuthStore.setState({ token: "test-admin-token-marker" });
   });
 
   it("exposes an accessible keyboard-operable upload control", () => {

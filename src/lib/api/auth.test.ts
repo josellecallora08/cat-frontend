@@ -20,7 +20,7 @@ describe("Lark OAuth API", () => {
         http.get("/api/auth/lark/authorize", () => {
           return HttpResponse.json({
             authorize_url: "https://open.larksuite.com/open-apis/authen/v1/authorize?app_id=test",
-            state: "random-state-token",
+            state: "test-state-marker",
           });
         }),
       );
@@ -28,7 +28,7 @@ describe("Lark OAuth API", () => {
       const result = await getLarkAuthorizeUrl();
 
       expect(result.authorize_url).toContain("larksuite.com");
-      expect(result.state).toBe("random-state-token");
+      expect(result.state).toBe("test-state-marker");
     });
 
     it("throws error when Lark is not configured (503)", async () => {
@@ -50,7 +50,7 @@ describe("Lark OAuth API", () => {
       server.use(
         http.post("/api/auth/lark/callback", () => {
           return HttpResponse.json({
-            access_token: "jwt-token-123",
+            access_token: "test-access-token-marker",
             token_type: "bearer",
             user: {
               id: "user-uuid",
@@ -63,9 +63,9 @@ describe("Lark OAuth API", () => {
         }),
       );
 
-      const result = await larkCallback("auth-code", "state-token");
+      const result = await larkCallback("test-auth-code", "test-state-marker");
 
-      expect(result.access_token).toBe("jwt-token-123");
+      expect(result.access_token).toBe("test-access-token-marker");
       expect(result.user.email).toBe("lark@company.com");
       expect(result.user.full_name).toBe("Lark User");
     });
@@ -99,4 +99,3 @@ describe("Lark OAuth API", () => {
     });
   });
 });
-
