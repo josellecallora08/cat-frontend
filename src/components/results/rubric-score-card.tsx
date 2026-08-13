@@ -27,7 +27,15 @@ export function RubricScoreCard({ category, transcript = [] }: RubricScoreCardPr
       </div>
 
       <div className="grid gap-3 text-sm sm:grid-cols-2">
-        <div className="rounded-lg bg-muted/40 p-3"><p className="text-xs text-muted-foreground">Raw score</p><p className="mt-1 font-semibold text-foreground">{category.raw_score === null ? "Not applicable" : `${category.raw_score}/100`}</p></div>
+      <div
+        role="img"
+        aria-label={`${category.category} score visualization: ${scoreLabel}`}
+        className="rounded-lg bg-muted/40 p-3"
+      >
+        <p className="text-xs text-muted-foreground">Raw score</p>
+        <p className="mt-1 font-semibold text-foreground">{category.raw_score === null ? "Not applicable" : `${category.raw_score}/100`}</p>
+        <p className="sr-only">Final category score: {scoreLabel}. Passing status: {category.passed ? "passing" : "needs practice"}.</p>
+      </div>
         <div className="rounded-lg bg-muted/40 p-3"><p className="text-xs text-muted-foreground">Penalty applied</p><p className="mt-1 font-semibold text-foreground">-{category.penalty_total} points</p></div>
       </div>
 

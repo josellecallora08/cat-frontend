@@ -14,12 +14,15 @@ import { UserCreateDialog } from "@/components/admin/user-create-dialog";
 import { UserDeleteDialog } from "@/components/admin/user-delete-dialog";
 import { UserEditDialog } from "@/components/admin/user-edit-dialog";
 import { UserTable } from "@/components/admin/user-table";
+import { UserMetrics } from "@/components/admin/user-metrics";
 import { useAdminUsers, useUpdateAdminUserStatus } from "@/hooks/use-admin-users";
 import type { AdminUser } from "@/lib/api/admin-users";
+import type { AdminUserFilters } from "@/lib/api/admin-users";
 import { useAuthStore } from "@/stores/auth-store";
 
 export default function AdminUsersPage() {
-  const { data: users, isLoading, isError, refetch } = useAdminUsers();
+  const [filters, setFilters] = useState<AdminUserFilters>({});
+  const { data: users, isLoading, isError, refetch } = useAdminUsers(filters);
   const updateStatus = useUpdateAdminUserStatus();
   const currentUser = useAuthStore((s) => s.user);
 
@@ -28,6 +31,7 @@ export default function AdminUsersPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
+  const hasFilters = Boolean(filters.search || filters.role || filters.user_type || filters.is_active !== undefined);
 
   function handleEdit(user: AdminUser) {
     setSelectedUser(user);
@@ -96,7 +100,12 @@ export default function AdminUsersPage() {
         }
       />
 
-      {users && users.length === 0 ? (
+      <UserMetrics
+        totalUsers={users?.length ?? 0}
+        activeUsers={users?.filter((user) => user.is_active).length ?? 0}
+      />
+
+      {users && users.length === 0 && !hasFilters ? (
         <PageEmpty
           icon={Users}
           title="No users found"
@@ -108,6 +117,8 @@ export default function AdminUsersPage() {
         <UserTable
           users={users ?? []}
           currentUserId={currentUser?.id ?? ""}
+          filters={filters}
+          onFiltersChange={setFilters}
           onEdit={handleEdit}
           onResetPassword={handleResetPassword}
           onDeactivate={handleDeactivate}

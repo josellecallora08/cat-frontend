@@ -6,6 +6,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Select } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth-store";
+import { serializeDashboardSessionParams } from "@/lib/api/sessions";
+import { fetchDashboardAgents, type DashboardAgent } from "@/lib/api/dashboard";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import gsap from "gsap";
 import {
@@ -67,17 +69,18 @@ async function fetchSessions(params: {
   status: string;
   sortBy: SortBy;
   sortDir: SortDir;
+  search?: string;
   token?: string;
 }): Promise<PaginatedSessions> {
-  const qs = new URLSearchParams({
-    page: String(params.page),
-    page_size: String(PAGE_SIZE),
+  const qs = serializeDashboardSessionParams({
+    page: params.page,
+    page_size: PAGE_SIZE,
     sort_by: params.sortBy,
     sort_dir: params.sortDir,
+    agent_id: params.agentId,
+    status: params.status === "ALL" ? undefined : params.status,
+    search: params.search,
   });
-  if (params.agentId) qs.set("agent_id", params.agentId);
-  if (params.status !== "ALL") qs.set("status", params.status);
-
   const headers: Record<string, string> = {};
   if (params.token) {
     headers["Authorization"] = `Bearer ${params.token}`;
@@ -124,17 +127,28 @@ export default function SessionsPage() {
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState("ALL");
   const [sort, setSort] = useState<`${SortBy}:${SortDir}`>("created_at:desc");
+  const [search, setSearch] = useState("");
+  const [selectedAgentId, setSelectedAgentId] = useState("");
   const [sortBy, sortDir] = sort.split(":") as [SortBy, SortDir];
 
+  const { data: agents = [] } = useQuery<DashboardAgent[]>({
+    queryKey: ["dashboard-agents", token],
+    queryFn: () => fetchDashboardAgents(token ?? undefined),
+    enabled: isAdmin || isTrainer,
+  });
+
+  const selectedAgent = isAdmin || isTrainer ? selectedAgentId || undefined : agentFilter;
+
   const { data, isLoading, isFetching, isError, refetch } = useQuery({
-    queryKey: ["sessions", agentFilter, page, status, sortBy, sortDir],
+    queryKey: ["sessions", selectedAgent, page, status, sortBy, sortDir, search],
     queryFn: () =>
       fetchSessions({
         page,
-        agentId: agentFilter,
+        agentId: selectedAgent,
         status,
         sortBy,
         sortDir,
+        search,
         token: token ?? undefined,
       }),
     placeholderData: keepPreviousData,
@@ -143,7 +157,7 @@ export default function SessionsPage() {
   // Reset to first page whenever filters/sort change
   useEffect(() => {
     setPage(1);
-  }, [status, sort]);
+  }, [selectedAgentId, status, sort, search]);
 
   const sessions = data?.items ?? [];
   const totalPages = data?.total_pages ?? 1;
@@ -255,6 +269,21 @@ export default function SessionsPage() {
       </header>
 
       {/* Status filter tabs */}
+      <div className="flex flex-col gap-3 sm:flex-row">
+        {(isAdmin || isTrainer) && (
+          <Select
+            ariaLabel="Filter by agent"
+            value={selectedAgentId}
+            onChange={setSelectedAgentId}
+            options={[
+              { value: "", label: "All agents" },
+              ...agents.map((agent) => ({ value: agent.id, label: agent.full_name })),
+            ]}
+            className="sm:w-56"
+          />
+        )}
+        <input aria-label="Search sessions" placeholder="Search sessions..." value={search} onChange={(e) => setSearch(e.target.value)} className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm" />
+      </div>
       <div
         ref={tablistRef}
         role="tablist"

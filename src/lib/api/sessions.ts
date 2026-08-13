@@ -191,7 +191,27 @@ export interface LearningPlan {
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
 
-<<<<<<< HEAD
+export type DashboardSessionSortBy = "created_at" | "score" | "scenario" | "status";
+export type DashboardSessionSortDir = "asc" | "desc";
+
+export interface DashboardSessionRequestParams {
+  page: number;
+  page_size: number;
+  agent_id?: string;
+  status?: string;
+  search?: string;
+  sort_by?: DashboardSessionSortBy;
+  sort_dir?: DashboardSessionSortDir;
+}
+
+export function serializeDashboardSessionParams(params: DashboardSessionRequestParams): string {
+  const query = new URLSearchParams();
+  (Object.entries(params) as [keyof DashboardSessionRequestParams, string | number | undefined][]).forEach(([key, value]) => {
+    if (value !== undefined && value !== "") query.set(key, String(value));
+  });
+  return query.toString();
+}
+
 export type ArtifactErrorCategory =
   | "unauthorized"
   | "forbidden"
@@ -313,13 +333,10 @@ async function requestArtifact<T>(
   }
 }
 
-export async function createSession(scenarioId: string): Promise<SessionResponse> {
-=======
 export async function createSession(
   scenarioId: string,
   campaignId?: string,
 ): Promise<SessionResponse> {
->>>>>>> e904fdc92547a3c4311e0627222c20c55c8d99c9
   const token = typeof window !== "undefined" ? localStorage.getItem("cat_token") : null;
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (token) headers["Authorization"] = `Bearer ${token}`;

@@ -29,6 +29,12 @@ export interface AgentRanking {
   improvement: number | null;
 }
 
+export interface DashboardAgent {
+  id: string;
+  full_name: string;
+  email: string;
+}
+
 export interface ScoreDataPoint {
   session_number: number;
   overall_score: number;
@@ -114,6 +120,23 @@ export async function fetchLeaderboard(
   const res = await fetch(`${API_BASE_URL}/api/dashboard/leaderboard`, {
     headers,
   });
+  handleUnauthorized(res);
+  if (!res.ok) return [];
+  return res.json();
+}
+
+/**
+ * Fetch agents the authenticated user is allowed to inspect.
+ * The dashboard endpoint remains the source of truth for role/campaign scope.
+ */
+export async function fetchDashboardAgents(
+  token?: string
+): Promise<DashboardAgent[]> {
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+  const res = await fetch(`${API_BASE_URL}/api/dashboard/agents`, { headers });
   handleUnauthorized(res);
   if (!res.ok) return [];
   return res.json();

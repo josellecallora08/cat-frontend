@@ -9,12 +9,12 @@ import {
     UserCheck,
     UserX,
 } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import { useRef, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, type SelectOption } from "@/components/ui/select";
-import type { AdminUser } from "@/lib/api/admin-users";
+import type { AdminUser, AdminUserFilters } from "@/lib/api/admin-users";
 
 interface UserTableProps {
   users: AdminUser[];
@@ -24,6 +24,8 @@ interface UserTableProps {
   onDeactivate: (user: AdminUser) => void;
   onReactivate: (user: AdminUser) => void;
   onDelete: (user: AdminUser) => void;
+  filters: AdminUserFilters;
+  onFiltersChange: (filters: AdminUserFilters) => void;
 }
 
 const roleOptions: SelectOption[] = [
@@ -38,6 +40,12 @@ const statusOptions: SelectOption[] = [
   { value: "inactive", label: "Inactive" },
 ];
 
+const userTypeOptions: SelectOption[] = [
+  { value: "all", label: "All User Types" },
+  { value: "agent", label: "Agent" },
+  { value: "trainer", label: "Trainer" },
+];
+
 export function UserTable({
   users,
   currentUserId,
@@ -46,29 +54,11 @@ export function UserTable({
   onDeactivate,
   onReactivate,
   onDelete,
+  filters,
+  onFiltersChange,
 }: UserTableProps) {
-  const [searchQuery, setSearchQuery] = useState("");
-  const [roleFilter, setRoleFilter] = useState("all");
-  const [statusFilter, setStatusFilter] = useState("all");
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
-
-  const filteredUsers = useMemo(() => {
-    return users.filter((user) => {
-      const query = searchQuery.toLowerCase();
-      const matchesSearch =
-        !query ||
-        user.full_name.toLowerCase().includes(query) ||
-        user.email.toLowerCase().includes(query);
-      const matchesRole =
-        roleFilter === "all" || user.role === roleFilter;
-      const matchesStatus =
-        statusFilter === "all" ||
-        (statusFilter === "active" && user.is_active) ||
-        (statusFilter === "inactive" && !user.is_active);
-      return matchesSearch && matchesRole && matchesStatus;
-    });
-  }, [users, searchQuery, roleFilter, statusFilter]);
 
   function formatUserType(user: AdminUser): string {
     if (user.role === "admin") return "\u2014";
@@ -92,8 +82,8 @@ export function UserTable({
           />
           <input
             type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            value={filters.search ?? ""}
+            onChange={(e) => onFiltersChange({ ...filters, search: e.target.value || undefined })}
             placeholder="Search by name or email..."
             aria-label="Search users by name or email"
             className="w-full rounded-lg border border-border bg-card py-2 pl-10 pr-3 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -101,28 +91,40 @@ export function UserTable({
         </div>
         <div className="flex gap-2">
           <Select
-            value={roleFilter}
-            onChange={setRoleFilter}
+            value={filters.role ?? "all"}
+            onChange={(value) => onFiltersChange({ ...filters, role: value === "all" ? undefined : value })}
             options={roleOptions}
             ariaLabel="Filter by role"
             size="sm"
             className="w-36"
           />
           <Select
-            value={statusFilter}
-            onChange={setStatusFilter}
+            value={filters.is_active === undefined ? "all" : filters.is_active ? "active" : "inactive"}
+            onChange={(value) => onFiltersChange({ ...filters, is_active: value === "all" ? undefined : value === "active" })}
             options={statusOptions}
             ariaLabel="Filter by status"
             size="sm"
             className="w-40"
           />
         </div>
+        <Select value={filters.user_type ?? "all"} onChange={(value) => onFiltersChange({ ...filters, user_type: value === "all" ? undefined : value })} options={userTypeOptions} ariaLabel="Filter by user type" size="sm" className="w-40" />
+        {(filters.search || filters.role || filters.user_type || filters.is_active !== undefined) && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            aria-label="Clear user filters"
+            onClick={() => onFiltersChange({})}
+          >
+            Clear filters
+          </Button>
+        )}
       </div>
 
       {/* Table */}
-      {filteredUsers.length === 0 ? (
+      {users.length === 0 ? (
         <p className="py-12 text-center text-sm text-muted-foreground">
-          No users match the current filters
+          No users match the current filters. Try changing or clearing your filters.
         </p>
       ) : (
         <div className="overflow-x-auto rounded-lg border border-border">
@@ -153,7 +155,7 @@ export function UserTable({
               </tr>
             </thead>
             <tbody>
-              {filteredUsers.map((user) => (
+              {users.map((user) => (
                 <tr
                   key={user.id}
                   className="border-b border-border last:border-b-0 hover:bg-muted/30"
