@@ -57,8 +57,14 @@ function sectionsFromPayload(payload: Record<string, unknown>): Record<ReportSec
 }
 
 export function parseReportPayload(payload: unknown, expectedSessionId?: string): NormalizedReport {
-  if (!isRecord(payload) || !isString(payload.session_id)
-    || (expectedSessionId !== undefined && payload.session_id !== expectedSessionId)) {
+  if (!isRecord(payload)) {
+    throw new Error("Report response is invalid.");
+  }
+  const session = isRecord(payload.session) ? payload.session : null;
+  const sessionId = isString(payload.session_id)
+    ? payload.session_id
+    : session && isString(session.id) ? session.id : null;
+  if (!sessionId || (expectedSessionId !== undefined && sessionId !== expectedSessionId)) {
     throw new Error("Report response is invalid.");
   }
   const sections = sectionsFromPayload(payload);
@@ -74,8 +80,8 @@ export function parseReportPayload(payload: unknown, expectedSessionId?: string)
     || payload.score_status === "unavailable" || payload.score_status === "failed"
     ? payload.score_status : tooShort ? "not_applicable" : "unavailable";
   return {
-    session_id: payload.session_id,
-    session: isRecord(payload.session) ? payload.session : null,
+    session_id: sessionId,
+    session,
     report_status: reportStatus,
     score_status: scoreStatus,
     evaluation_version: {

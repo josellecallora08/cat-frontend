@@ -27,6 +27,25 @@ describe("report contract normalization", () => {
     expect(report.sections.coaching.state).toBe("failed");
   });
 
+  it("accepts the backend report contract with the identifier nested under session", () => {
+    const backendPayload = payload({
+      session_id: undefined,
+      session: { id: "session-1", status: "completed" },
+      sections: [
+        envelope("metadata", "loaded", { status: "completed" }),
+        envelope("transcript", "empty"),
+        envelope("evaluation", "loaded", {
+          session_id: "session-1", is_too_short: false, rubric_result: null,
+        }),
+      ],
+    });
+
+    expect(parseReportPayload(backendPayload, "session-1")).toMatchObject({
+      session_id: "session-1",
+      session: { id: "session-1", status: "completed" },
+    });
+  });
+
   it("preserves canonical version metadata and too-short semantics", () => {
     const report = parseReportPayload(payload({
       report_status: "not_applicable",

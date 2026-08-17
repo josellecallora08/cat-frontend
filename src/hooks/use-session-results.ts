@@ -13,38 +13,38 @@ function retryResultQuery(failureCount: number, error: Error) {
   return failureCount < 3;
 }
 
-export function useEvaluation(sessionId: string) {
+export function useEvaluation(sessionId: string, enabled = true) {
   return useQuery({
     queryKey: ["sessions", sessionId, "evaluation"],
     queryFn: () => fetchEvaluation(sessionId),
-    enabled: Boolean(sessionId),
+    enabled: Boolean(sessionId) && enabled,
     retry: retryResultQuery,
   });
 }
 
-export function useTranscript(sessionId: string) {
+export function useTranscript(sessionId: string, enabled = true) {
   return useQuery({
     queryKey: ["sessions", sessionId, "transcript"],
     queryFn: () => fetchTranscript(sessionId),
-    enabled: Boolean(sessionId),
+    enabled: Boolean(sessionId) && enabled,
     retry: retryResultQuery,
   });
 }
 
-export function useCoaching(sessionId: string) {
+export function useCoaching(sessionId: string, enabled = true) {
   return useQuery({
     queryKey: ["sessions", sessionId, "coaching"],
     queryFn: () => fetchCoaching(sessionId),
-    enabled: Boolean(sessionId),
+    enabled: Boolean(sessionId) && enabled,
     retry: retryResultQuery,
   });
 }
 
-export function useLearningPlan(sessionId: string) {
+export function useLearningPlan(sessionId: string, enabled = true) {
   return useQuery({
     queryKey: ["sessions", sessionId, "learning-plan"],
     queryFn: () => fetchLearningPlan(sessionId),
-    enabled: Boolean(sessionId),
+    enabled: Boolean(sessionId) && enabled,
     retry: retryResultQuery,
   });
 }

@@ -46,6 +46,10 @@ interface TranscriptItem {
   system?: boolean;
 }
 
+function isAbortError(error: unknown): boolean {
+  return error instanceof DOMException && error.name === "AbortError";
+}
+
 // Status visuals map onto existing palette tokens only, always with a label.
 const statusConfig: Record<CallStatus, { label: string; dot: string; pulse: boolean }> = {
   idle: { label: "Ready", dot: "bg-muted-foreground", pulse: false },
@@ -93,10 +97,11 @@ function CallPageContent() {
   const [infoOpen, setInfoOpen] = useState(false);
   const [continuousMode, setContinuousMode] = useState(true);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const transcriptEndRef = useRef<HTMLDivElement>(null);
   const messageInFlightRef = useRef(false);
-  const initializationStartedRef = useRef(false);
   const listenTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const listeningAllowedRef = useRef(false);
 
   const elapsed = useElapsed(status !== "ended");
 
@@ -110,31 +115,35 @@ function CallPageContent() {
       const finish = () => {
         if (settled) return;
         settled = true;
+        audioRef.current = null;
         resolve();
       };
-      const timeout = setTimeout(finish, 15000);
+      const controller = new AbortController();
+      const requestTimeout = setTimeout(() => controller.abort(), 15000);
       try {
         const res = await fetch(`${API_BASE_URL}/api/tts`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ text, lang: "tl" }),
+          signal: controller.signal,
         });
+        clearTimeout(requestTimeout);
         if (!res.ok) throw new Error("TTS request failed");
         const audioBlob = await res.blob();
         const audioUrl = URL.createObjectURL(audioBlob);
         const audio = new Audio(audioUrl);
+        audioRef.current = audio;
         audio.onended = () => {
-          clearTimeout(timeout);
           URL.revokeObjectURL(audioUrl);
           finish();
         };
         audio.onerror = () => {
-          clearTimeout(timeout);
           URL.revokeObjectURL(audioUrl);
           finish();
         };
         await audio.play();
       } catch {
+        clearTimeout(requestTimeout);
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.lang = "fil-PH";
         utterance.rate = 0.9;
@@ -145,10 +154,21 @@ function CallPageContent() {
     });
   }, []);
 
+  const stopListening = useCallback(() => {
+    listeningAllowedRef.current = false;
+    if (listenTimerRef.current) {
+      clearTimeout(listenTimerRef.current);
+      listenTimerRef.current = null;
+    }
+    try {
+      recognitionRef.current?.abort();
+    } catch {
+      /* recognition is already stopped */
+    }
+  }, []);
+
   useEffect(() => {
     if (!sessionId) return;
-    if (initializationStartedRef.current) return;
-    initializationStartedRef.current = true;
     let cancelled = false;
     const controller = new AbortController();
     async function startCall() {
@@ -182,21 +202,25 @@ function CallPageContent() {
         if (cancelled) return;
         const data = await res.json();
         setTranscript([{ speaker: "debtor", text: data.text }]);
+        stopListening();
         setStatus("speaking");
         await speakText(data.text);
-        if (!cancelled) setStatus("active");
+        if (!cancelled) {
+          listeningAllowedRef.current = true;
+          setStatus("active");
+        }
       } catch (e) {
+        if (cancelled || controller.signal.aborted || isAbortError(e)) return;
         console.error("Failed to initialize call:", e);
-        if (!cancelled) setStatus("active");
+        setStatus("active");
       }
     }
     startCall();
     return () => {
       cancelled = true;
-      controller.abort();
+      if (!controller.signal.aborted) controller.abort();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessionId]);
+  }, [sessionId, speakText, stopListening, router]);
 
   const sendMessage = useCallback(
     async (text: string) => {
@@ -224,6 +248,7 @@ function CallPageContent() {
           speechSynthesis.cancel(); // Stop any browser TTS
         }
 
+        stopListening();
         setStatus("speaking");
         await speakText(data.text);
         if (data.call_ended) {
@@ -242,6 +267,7 @@ function CallPageContent() {
           setTimeout(() => router.push(`/sessions/${sessionId}/results`), 2000);
           return;
         }
+        listeningAllowedRef.current = true;
         setStatus("active");
       } catch (e) {
         setError(e instanceof Error ? e.message : "Failed to get a response.");
@@ -250,7 +276,7 @@ function CallPageContent() {
         messageInFlightRef.current = false;
       }
     },
-    [sessionId, speakText, router]
+    [sessionId, speakText, stopListening, router]
   );
 
   const startListening = useCallback(() => {
@@ -265,7 +291,13 @@ function CallPageContent() {
     recognition.interimResults = false;
     recognition.lang = "fil-PH";
 
-    recognition.onstart = () => setStatus("listening");
+    recognition.onstart = () => {
+      if (!listeningAllowedRef.current) {
+        recognition.abort();
+        return;
+      }
+      setStatus("listening");
+    };
 
     recognition.onresult = (event: SpeechRecognitionEvent) => {
       // Get the latest final result
@@ -292,7 +324,11 @@ function CallPageContent() {
     recognition.onend = () => {
       // Auto-restart if call is still active and in continuous mode
       setStatus((currentStatus) => {
-        if (currentStatus === "listening" && continuousMode) {
+        if (
+          currentStatus === "listening" &&
+          continuousMode &&
+          listeningAllowedRef.current
+        ) {
           listenTimerRef.current = setTimeout(() => {
             try {
               recognition.start();
@@ -311,7 +347,9 @@ function CallPageContent() {
   // Add a short delay to avoid picking up tail-end of TTS audio
   useEffect(() => {
     if (status === "active" && recognitionRef.current && continuousMode) {
+      listeningAllowedRef.current = true;
       const timer = setTimeout(() => {
+        if (!listeningAllowedRef.current) return;
         try {
           recognitionRef.current?.start();
           setStatus("listening");
@@ -324,11 +362,9 @@ function CallPageContent() {
   // Stop recognition while debtor is speaking (prevent mic picking up TTS)
   useEffect(() => {
     if (status === "speaking" || status === "processing") {
-      try {
-        recognitionRef.current?.stop();
-      } catch { /* not running */ }
+      stopListening();
     }
-  }, [status]);
+  }, [status, stopListening]);
 
   // Auto-start listening when call begins (first time only)
   const hasStartedListening = useRef(false);
@@ -337,6 +373,7 @@ function CallPageContent() {
     if (status === "active" && !hasStartedListening.current) {
       hasStartedListening.current = true;
       if (continuousMode) {
+        listeningAllowedRef.current = true;
         // Delay first listen to avoid picking up initial TTS
         listenTimerRef.current = setTimeout(() => startListening(), 600);
       }
@@ -347,8 +384,10 @@ function CallPageContent() {
   }, [status, startListening, continuousMode]);
 
   const endCall = useCallback(async () => {
+    stopListening();
+    audioRef.current?.pause();
+    audioRef.current = null;
     speechSynthesis.cancel();
-    recognitionRef.current?.abort();
     setStatus("ended");
     if (sessionId) {
       try {
@@ -360,7 +399,7 @@ function CallPageContent() {
     // Reset the session store so a new session can be created next time
     useSessionStore.getState().reset();
     setTimeout(() => router.push(`/sessions/${sessionId}/results`), 1200);
-  }, [sessionId, router]);
+  }, [sessionId, stopListening, router]);
 
   useEffect(() => {
     if (!pageRef.current) return;

@@ -25,7 +25,11 @@ import type {
     RubricRecommendation,
     TranscriptEntry,
 } from "@/lib/api/sessions";
-import { isValidScenarioId, SessionArtifactError } from "@/lib/api/sessions";
+import {
+    isValidScenarioId,
+    retryEvaluationGeneration,
+    SessionArtifactError,
+} from "@/lib/api/sessions";
 import { cn } from "@/lib/utils";
 import confetti from "canvas-confetti";
 import {
@@ -579,13 +583,47 @@ export default function SessionResultsPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
-  const evaluation = useEvaluation(id);
-  const transcript = useTranscript(id);
-  const coaching = useCoaching(id);
-  const learningPlan = useLearningPlan(id);
   const reportState = useReport(id);
+  const useLegacyArtifacts = reportState.isError;
+  const evaluation = useEvaluation(id, useLegacyArtifacts);
+  const transcript = useTranscript(id, useLegacyArtifacts);
+  const coaching = useCoaching(id, useLegacyArtifacts);
+  const learningPlan = useLearningPlan(id, useLegacyArtifacts);
+  const reportSections = reportState.report?.sections;
+  const reportEvaluation = reportSections?.evaluation.state === "loaded"
+    ? reportSections.evaluation.data as EvaluationResult
+    : null;
+  const reportTranscript = reportSections?.transcript.state === "loaded"
+    ? reportSections.transcript.data as TranscriptEntry[]
+    : null;
+  const reportCoaching = reportSections?.coaching.state === "loaded"
+    ? reportSections.coaching.data as CoachingReport
+    : null;
+  const reportLearningPlan = reportSections?.learning_plan.state === "loaded"
+    ? reportSections.learning_plan.data as LearningPlan
+    : null;
+  const evaluationData = reportEvaluation ?? evaluation.data;
+  const transcriptData = reportTranscript ?? transcript.data ?? [];
+  const coachingData = reportCoaching ?? coaching.data ?? null;
+  const learningPlanData = reportLearningPlan ?? learningPlan.data ?? null;
   const [step, setStep] = useState(0);
+  const [isRegenerating, setIsRegenerating] = useState(false);
+  const [regenerationError, setRegenerationError] = useState<string | null>(null);
   const stepContentRef = useRef<HTMLDivElement>(null);
+
+  const regenerateResults = async () => {
+    if (isRegenerating) return;
+    setIsRegenerating(true);
+    setRegenerationError(null);
+    try {
+      await retryEvaluationGeneration(id);
+      await reportState.retryAll();
+    } catch {
+      setRegenerationError("Evaluation generation failed. Please try again.");
+    } finally {
+      setIsRegenerating(false);
+    }
+  };
 
   useEffect(() => {
     stepContentRef.current?.focus();
@@ -594,16 +632,37 @@ export default function SessionResultsPage({
   const TOTAL_STEPS = 7;
 
   // Evaluation is the primary artifact; other panels render independently as they arrive.
-  if (evaluation.isLoading && !reportState.report) {
+  if (reportState.isLoading || (!reportState.report && evaluation.isLoading)) {
     return <CatLoading />;
   }
 
   // The aggregate report is authoritative; only fall back to the legacy query when it is unavailable.
-  if (evaluation.isError && !reportState.report) {
+  if (useLegacyArtifacts && evaluation.isError) {
     return <ErrorState title="evaluation" error={evaluation.error} onRetry={() => evaluation.refetch()} />;
   }
 
-  if (!evaluation.data) {
+  if (!evaluationData) {
+    const sectionFailure = reportSections?.evaluation.failure;
+    if (sectionFailure) {
+      return <ErrorState title="evaluation" error={new Error(sectionFailure.safe_message)} onRetry={() => { void reportState.retrySection("evaluation"); }} />;
+    }
+    if (reportSections?.evaluation.state === "empty") {
+      return (
+        <div className="flex min-h-screen items-center justify-center px-4">
+          <div className="max-w-md space-y-4 text-center">
+            <AlertCircle className="mx-auto h-8 w-8 text-[#F59E0B]" />
+            <h1 className="text-lg font-medium text-foreground">Results were not generated</h1>
+            <p className="text-sm text-muted-foreground">
+              The session and transcript were saved, but evaluation processing did not finish.
+            </p>
+            {regenerationError && <p role="alert" className="text-sm text-destructive">{regenerationError}</p>}
+            <Button onClick={() => { void regenerateResults(); }} disabled={isRegenerating}>
+              {isRegenerating ? "Generating results…" : "Generate results again"}
+            </Button>
+          </div>
+        </div>
+      );
+    }
     return <CatLoading />;
   }
 
@@ -617,7 +676,7 @@ export default function SessionResultsPage({
     "worried",      // 2: Weaknesses
     "thinking",     // 3: Coaching
     "encouraging",  // 4: Learning plan
-    isEvaluationNotApplicable(evaluation.data) ? "neutral" : getOverallScore(evaluation.data) >= getPassingThreshold(evaluation.data) ? "celebrating" : "encouraging", // 5: Overall score
+    isEvaluationNotApplicable(evaluationData) ? "neutral" : getOverallScore(evaluationData) >= getPassingThreshold(evaluationData) ? "celebrating" : "encouraging", // 5: Overall score
     "proud",        // 6: Summary
   ];
 
@@ -665,23 +724,23 @@ export default function SessionResultsPage({
           </div>
           <div className="w-full">
             {step === 0 && (
-              transcript.isLoading ? <ArtifactLoading label="transcript" />
+              useLegacyArtifacts && transcript.isLoading ? <ArtifactLoading label="transcript" />
                 : transcript.isError ? <ErrorState title="transcript" error={transcript.error} onRetry={() => transcript.refetch()} />
-                  : <EvaluationStep data={evaluation.data} transcript={transcript.data ?? []} />
+                  : <EvaluationStep data={evaluationData} transcript={transcriptData} />
             )}
-            {step === 1 && <StrengthsStep data={evaluation.data} />}
+            {step === 1 && <StrengthsStep data={evaluationData} />}
             {step === 4 && (
-              isEvaluationNotApplicable(evaluation.data) ? <LearningPlanStep data={learningPlan.data ?? { session_id: id, weak_competencies: [], all_passing: true }} passingScore={getPassingThreshold(evaluation.data)} notApplicable />
-                : learningPlan.isLoading ? <ArtifactLoading label="learning plan" />
+              isEvaluationNotApplicable(evaluationData) ? <LearningPlanStep data={learningPlanData ?? { session_id: id, weak_competencies: [], all_passing: true }} passingScore={getPassingThreshold(evaluationData)} notApplicable />
+                : useLegacyArtifacts && learningPlan.isLoading ? <ArtifactLoading label="learning plan" />
                   : learningPlan.isError ? (
                     <ErrorState title="learning plan" error={learningPlan.error} onRetry={() => learningPlan.refetch()} />
-                  ) : learningPlan.data ? (
-                    <LearningPlanStep data={learningPlan.data} passingScore={getPassingThreshold(evaluation.data)} notApplicable={false} />
+                  ) : learningPlanData ? (
+                    <LearningPlanStep data={learningPlanData} passingScore={getPassingThreshold(evaluationData)} notApplicable={false} />
                   ) : (
                     <p className="text-sm text-muted-foreground text-center py-8">Learning plan not available yet.</p>
                   )
             )}
-            {step === 5 && <OverallScoreStep data={evaluation.data} />}
+            {step === 5 && <OverallScoreStep data={evaluationData} />}
           </div>
         </div>
       ) : (
@@ -703,19 +762,19 @@ export default function SessionResultsPage({
             aria-live="polite"
             className="min-h-0 flex-1 overflow-y-auto motion-safe:animate-in motion-safe:fade-in-0 motion-safe:slide-in-from-right-4 motion-safe:duration-300 w-full max-w-lg mx-auto focus-visible:outline-none"
           >
-            {step === 2 && <WeaknessesStep data={evaluation.data} />}
+            {step === 2 && <WeaknessesStep data={evaluationData} />}
             {step === 3 && (
-              isEvaluationNotApplicable(evaluation.data) ? <CoachingStep data={coaching.data ?? { session_id: id, mistakes_by_category: {}, total_mistakes: 0, no_mistakes: true }} evaluation={evaluation.data} notApplicable />
-                : coaching.isLoading ? <ArtifactLoading label="coaching report" />
+              isEvaluationNotApplicable(evaluationData) ? <CoachingStep data={coachingData ?? { session_id: id, mistakes_by_category: {}, total_mistakes: 0, no_mistakes: true }} evaluation={evaluationData} notApplicable />
+                : useLegacyArtifacts && coaching.isLoading ? <ArtifactLoading label="coaching report" />
                   : coaching.isError ? (
                     <ErrorState title="coaching report" error={coaching.error} onRetry={() => coaching.refetch()} />
-                  ) : coaching.data ? (
-                    <CoachingStep data={coaching.data} evaluation={evaluation.data} notApplicable={false} />
+                  ) : coachingData ? (
+                    <CoachingStep data={coachingData} evaluation={evaluationData} notApplicable={false} />
                   ) : (
                     <p className="text-sm text-muted-foreground text-center py-8">Coaching data not available yet.</p>
                   )
             )}
-            {step === 6 && <SummaryStep data={evaluation.data} coaching={coaching.data ?? null} learningPlan={learningPlan.data ?? null} />}
+            {step === 6 && <SummaryStep data={evaluationData} coaching={coachingData} learningPlan={learningPlanData} />}
           </div>
         </>
       )}

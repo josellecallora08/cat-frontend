@@ -658,6 +658,20 @@ export async function fetchEvaluation(sessionId: string): Promise<EvaluationResu
   );
 }
 
+export async function retryEvaluationGeneration(sessionId: string): Promise<void> {
+  const token = typeof window !== "undefined"
+    ? window.localStorage?.getItem("cat_token") ?? null
+    : null;
+  const response = await fetch(
+    `${API_BASE_URL}/api/sessions/${sessionId}/evaluation/retry`,
+    {
+      method: "POST",
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    },
+  );
+  if (!response.ok) throw safeStatusError("evaluation", response.status);
+}
+
 export async function fetchCoaching(sessionId: string): Promise<CoachingReport> {
   return requestArtifact(
     "coaching",
