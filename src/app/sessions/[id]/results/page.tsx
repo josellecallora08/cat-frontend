@@ -1,8 +1,6 @@
 "use client";
 
 import { CatMascotSvg } from "@/components/auth/CatMascotSvg";
-import type { CatEmotion } from "@/components/results/OrangeCatMascot";
-import { OrangeCatMascot } from "@/components/results/OrangeCatMascot";
 import { PrintReportSection } from "@/components/results/print-report-section";
 import { RecommendationPanel } from "@/components/results/recommendation-panel";
 import { ReportShell } from "@/components/results/report-shell";
@@ -25,6 +23,7 @@ import type {
     RubricRecommendation,
     TranscriptEntry,
 } from "@/lib/api/sessions";
+import type { NormalizedReport, ReportSectionName } from "@/types/report";
 import {
     isValidScenarioId,
     retryEvaluationGeneration,
@@ -35,7 +34,6 @@ import confetti from "canvas-confetti";
 import {
     AlertCircle,
     AlertTriangle,
-    ArrowLeft,
     ArrowRight,
     CheckCircle2,
     ThumbsUp,
@@ -143,75 +141,14 @@ function CatLoading() {
   );
 }
 
-// --- Step navigation bar ---
-function StepNav({
-  currentStep,
-  totalSteps,
-  onPrev,
-  onNext,
-  onStepClick,
-  nextLabel,
-}: {
-  currentStep: number;
-  totalSteps: number;
-  onPrev: () => void;
-  onNext: () => void;
-  onStepClick: (step: number) => void;
-  nextLabel?: string;
-}) {
-  return (
-    <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
-      {currentStep === 0 ? (
-        <Link href="/sessions" className="max-w-[42%] shrink-0">
-          <Button variant="outline" size="sm" className="min-h-11 max-w-full gap-1.5 px-2 sm:px-3">
-            <ArrowLeft className="h-4 w-4 shrink-0" />
-            <span className="truncate">All Sessions</span>
-          </Button>
-        </Link>
-      ) : (
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={onPrev}
-          className="min-h-11 shrink-0 gap-1.5 px-2 sm:px-3"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Back
-        </Button>
-      )}
-      <div className="order-3 flex min-w-0 max-w-full flex-1 items-center justify-center gap-0 overflow-x-auto px-1 sm:order-none sm:gap-1.5">
-        {Array.from({ length: totalSteps }).map((_, i) => (
-          <button
-            key={i}
-            type="button"
-            onClick={() => onStepClick(i)}
-            className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full px-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            aria-label={`Go to step ${i + 1}`}
-            aria-current={i === currentStep ? "step" : undefined}
-          >
-            <span className={cn(
-              "block rounded-full transition-all duration-300 motion-reduce:transition-none",
-              i === currentStep ? "h-2 w-6 bg-[#8F6AE0]" : "h-2 w-2 bg-[#8F6AE0]/20 hover:bg-[#8F6AE0]/40"
-            )} />
-          </button>
-        ))}
-      </div>
-      <Button size="sm" onClick={onNext} className="min-h-11 max-w-[42%] shrink-0 gap-1.5 px-2 sm:px-3">
-        <span className="truncate">{nextLabel ?? "Next"}</span>
-        <ArrowRight className="h-4 w-4" />
-      </Button>
-    </div>
-  );
-}
-
 // --- Step 1: Evaluation scores ---
 function EvaluationStep({ data, transcript }: { data: EvaluationResult; transcript: TranscriptEntry[] }) {
   const canonical = data.rubric_result;
   if (canonical?.status === "not_applicable") {
-    return <div role="status" className="space-y-3 rounded-xl border border-[#F59E0B]/30 bg-[#F59E0B]/5 p-5 text-sm text-muted-foreground"><StandardContext data={data} /><p>Evaluation not applicable: {canonical.summary}</p></div>;
+    return <div role="status" className="space-y-3 rounded-xl border border-[#F59E0B]/30 bg-[#F59E0B]/5 p-5 text-sm text-muted-foreground"><p>Evaluation not applicable: {canonical.summary}</p></div>;
   }
   if (canonical?.categories.length) {
-    return <div className="space-y-4"><StandardContext data={data} />{canonical.categories.map((category) => <RubricScoreCard key={category.rubric_block_id} category={category} transcript={transcript} />)}</div>;
+    return <div className="space-y-4">{canonical.categories.map((category) => <RubricScoreCard key={category.rubric_block_id} category={category} transcript={transcript} />)}</div>;
   }
 
   return (
@@ -222,6 +159,53 @@ function EvaluationStep({ data, transcript }: { data: EvaluationResult; transcri
         {data.category_scores.map((item: CompetencyScore) => <div key={item.category} className="space-y-1.5"><div className="flex justify-between text-sm"><span className="font-medium text-foreground">{formatCategoryLabel(item.category)}</span><span className="text-muted-foreground">{item.score}/100{formatWeight(item.category) && ` · ${formatWeight(item.category)}`}</span></div><div className="h-2.5 w-full overflow-hidden rounded-full bg-muted"><div role="img" aria-label={`${formatCategoryLabel(item.category)} score: ${item.score} out of 100`} className={cn("h-full rounded-full transition-all motion-reduce:transition-none", scoreToneBar(item.score))} style={{ width: `${item.score}%` }}><span className="sr-only">{item.score} out of 100</span></div></div></div>)}
       </div>
     </div>
+  );
+}
+
+function TranscriptStep({ entries, isLoading, error, onRetry }: { entries: TranscriptEntry[]; isLoading: boolean; error: Error | null; onRetry: () => void }) {
+  if (isLoading) return <ArtifactLoading label="transcript" />;
+  if (error) return <ErrorState title="transcript" error={error} onRetry={onRetry} />;
+  if (entries.length === 0) return <p className="rounded-xl border border-border p-5 text-sm text-muted-foreground">No transcript was recorded.</p>;
+  return (
+    <div className="rounded-2xl border border-border bg-muted/20 p-3 sm:p-5" aria-label="Conversation transcript">
+      <div className="space-y-4">
+        {entries.map((entry) => {
+          const isAgent = entry.speaker === "agent";
+          return (
+            <article key={`${entry.sequence_number}-${entry.timestamp}`} className={`flex ${isAgent ? "justify-end" : "justify-start"}`}>
+              <div className={`flex max-w-[88%] flex-col gap-1 sm:max-w-[75%] ${isAgent ? "items-end" : "items-start"}`}>
+                <div className="flex items-center gap-2 px-1 text-xs text-muted-foreground">
+                  <span className="font-semibold text-foreground">{isAgent ? "You" : "Customer"}</span>
+                  <time>{entry.timestamp}</time>
+                </div>
+                <div className={`rounded-2xl px-4 py-3 text-sm leading-6 shadow-sm ${isAgent ? "rounded-br-sm bg-primary text-primary-foreground" : "rounded-bl-sm border border-border bg-card text-foreground"}`}>
+                  {entry.text}
+                </div>
+              </div>
+            </article>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function MetadataStep({ report }: { report: NormalizedReport | null }) {
+  if (!report) return <p className="rounded-xl border border-border p-5 text-sm text-muted-foreground">Session metadata is unavailable.</p>;
+  const session = report.session ?? {};
+  const value = (key: string, fallback: string) => typeof session[key] === "string" ? session[key] as string : fallback;
+  return (
+    <dl className="grid gap-3 sm:grid-cols-2">
+      {[
+        ["Session ID", report.session_id],
+        ["Scenario", value("scenario_name", value("scenario", "Unavailable"))],
+        ["Participant", value("user_name", value("agent_name", "Unavailable"))],
+        ["Report status", report.report_status],
+        ["Score status", report.score_status],
+        ["Evaluation", report.evaluation_version.name ?? (report.evaluation_kind === "legacy" ? "Legacy evaluation" : "Current evaluation")],
+        ["Version", report.evaluation_version.number?.toString() ?? "Unavailable"],
+      ].map(([label, content]) => <div key={label} className="rounded-xl border border-border p-4"><dt className="text-xs uppercase tracking-wide text-muted-foreground">{label}</dt><dd className="mt-1 text-sm font-medium text-foreground">{content}</dd></div>)}
+    </dl>
   );
 }
 
@@ -629,8 +613,6 @@ export default function SessionResultsPage({
     stepContentRef.current?.focus();
   }, [step]);
 
-  const TOTAL_STEPS = 7;
-
   // Evaluation is the primary artifact; other panels render independently as they arrive.
   if (reportState.isLoading || (!reportState.report && evaluation.isLoading)) {
     return <CatLoading />;
@@ -666,19 +648,15 @@ export default function SessionResultsPage({
     return <CatLoading />;
   }
 
-  const goNext = () => setStep((s) => Math.min(s + 1, TOTAL_STEPS - 1));
-  const goPrev = () => setStep((s) => Math.max(s - 1, 0));
-
-  // Map step index to cat emotion
-  const stepEmotions: CatEmotion[] = [
-    "neutral",      // 0: Evaluation scores
-    "happy",        // 1: Strengths
-    "worried",      // 2: Weaknesses
-    "thinking",     // 3: Coaching
-    "encouraging",  // 4: Learning plan
-    isEvaluationNotApplicable(evaluationData) ? "neutral" : getOverallScore(evaluationData) >= getPassingThreshold(evaluationData) ? "celebrating" : "encouraging", // 5: Overall score
-    "proud",        // 6: Summary
-  ];
+  const sectionForStep: ReportSectionName[] = ["evaluation", "summary", "summary", "coaching", "learning_plan", "summary", "summary", "transcript", "metadata"];
+  const stepForSection: Partial<Record<ReportSectionName, number>> = {
+    metadata: 8,
+    transcript: 7,
+    evaluation: 0,
+    coaching: 3,
+    learning_plan: 4,
+    summary: 6,
+  };
 
   // Step titles and descriptions
   const stepMeta: { title: string; description: string }[] = [
@@ -689,14 +667,16 @@ export default function SessionResultsPage({
     { title: "Learning Plan", description: "Criterion-specific practice focus" },
     { title: "Overall Score", description: "Your final performance rating" },
     { title: "Session Complete", description: "Full performance breakdown" },
+    { title: "Transcript", description: "Review the conversation" },
+    { title: "Metadata", description: "Session and evaluation details" },
   ];
 
   // Steps that have short content and can fit in 1 centered div
   const isCompactStep = step === 0 || step === 1 || step === 4 || step === 5;
 
   return (
-    <ReportShell report={reportState.report} reportError={reportState.metadata.error ?? null} sessionId={id} onRetry={() => { void reportState.retryAll(); }} onRetrySection={(name) => { void reportState.retrySection(name); }}>
-      <div className="report-print-root flex min-h-screen flex-col overflow-x-hidden px-4 py-6">
+    <ReportShell report={reportState.report} reportError={reportState.metadata.error ?? null} sessionId={id} onRetry={() => { void reportState.retryAll(); }} onRetrySection={(name) => { void reportState.retrySection(name); }} activeSection={sectionForStep[step]} onSectionSelect={(name) => { const target = stepForSection[name]; if (target !== undefined) setStep(target); }} headerTitle={stepMeta[step].title} headerDescription={stepMeta[step].description}>
+      <div className="report-print-root flex flex-col overflow-x-hidden px-4 py-6">
       <PrintReportSection
         className="flex min-h-0 flex-1 flex-col"
         sectionName={stepMeta[step].title}
@@ -705,23 +685,14 @@ export default function SessionResultsPage({
         /* Compact steps: everything in one vertically-centered div */
         <div
           key={step}
-          className={cn(
-            "min-h-0 flex-1 overflow-y-auto flex flex-col justify-start py-2 items-center motion-safe:animate-in motion-safe:fade-in-0 motion-safe:slide-in-from-right-4 motion-safe:duration-300 w-full",
-            step < 6 && "max-w-lg mx-auto"
+            className={cn(
+            "flex flex-col justify-start py-2 items-center motion-safe:animate-in motion-safe:fade-in-0 motion-safe:slide-in-from-right-4 motion-safe:duration-300 w-full",
+            step < 6 && "max-w-4xl mx-auto"
           )}
           ref={stepContentRef}
           tabIndex={-1}
           aria-live="polite"
         >
-          <h2 className="text-xl md:text-2xl font-bold text-foreground text-center">
-            {stepMeta[step].title}
-          </h2>
-          <p className="text-sm text-muted-foreground text-center mt-1 mb-3">
-            {stepMeta[step].description}
-          </p>
-          <div className="screen-only-decoration flex justify-center mb-3">
-            <OrangeCatMascot emotion={stepEmotions[step]} className="w-16 h-16 md:w-20 md:h-20" />
-          </div>
           <div className="w-full">
             {step === 0 && (
               useLegacyArtifacts && transcript.isLoading ? <ArtifactLoading label="transcript" />
@@ -746,21 +717,12 @@ export default function SessionResultsPage({
       ) : (
         /* Content-heavy steps: fixed header + scrollable content */
         <>
-          <h2 className="text-xl md:text-2xl font-bold text-foreground text-center shrink-0">
-            {stepMeta[step].title}
-          </h2>
-          <p className="text-sm text-muted-foreground text-center mt-1 mb-3 shrink-0">
-            {stepMeta[step].description}
-          </p>
-          <div className="screen-only-decoration flex justify-center mb-3 shrink-0">
-            <OrangeCatMascot emotion={stepEmotions[step]} className="w-16 h-16 md:w-20 md:h-20" />
-          </div>
           <div
             key={step}
             ref={stepContentRef}
             tabIndex={-1}
             aria-live="polite"
-            className="min-h-0 flex-1 overflow-y-auto motion-safe:animate-in motion-safe:fade-in-0 motion-safe:slide-in-from-right-4 motion-safe:duration-300 w-full max-w-lg mx-auto focus-visible:outline-none"
+            className="motion-safe:animate-in motion-safe:fade-in-0 motion-safe:slide-in-from-right-4 motion-safe:duration-300 w-full max-w-4xl mx-auto focus-visible:outline-none"
           >
             {step === 2 && <WeaknessesStep data={evaluationData} />}
             {step === 3 && (
@@ -775,25 +737,12 @@ export default function SessionResultsPage({
                   )
             )}
             {step === 6 && <SummaryStep data={evaluationData} coaching={coachingData} learningPlan={learningPlanData} />}
+            {step === 7 && <TranscriptStep entries={transcriptData} isLoading={transcript.isLoading} error={transcript.isError ? transcript.error : null} onRetry={() => { void transcript.refetch(); }} />}
+            {step === 8 && <MetadataStep report={reportState.report} />}
           </div>
         </>
       )}
 
-      {/* Navigation — pinned at bottom */}
-      <div className="screen-only-controls">
-      {step < TOTAL_STEPS - 1 && (
-        <div className="max-w-lg mx-auto w-full pt-4 shrink-0">
-          <StepNav
-            currentStep={step}
-            totalSteps={TOTAL_STEPS}
-            onPrev={goPrev}
-            onNext={goNext}
-            onStepClick={setStep}
-            nextLabel={step === TOTAL_STEPS - 2 ? "View Summary" : "Next"}
-          />
-        </div>
-      )}
-      </div>
       </PrintReportSection>
     </div>
     </ReportShell>
