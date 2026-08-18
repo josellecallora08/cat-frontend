@@ -57,6 +57,7 @@ const LEGACY_CATEGORY_WEIGHTS: Record<string, number> = {
 };
 
 const LEGACY_PASS_THRESHOLD = 70;
+const STEP_KEYS = ["evaluation", "strengths", "weaknesses", "coaching", "learning-plan", "overall-score", "summary"] as const;
 
 function formatCategoryLabel(category: string): string {
   return CATEGORY_LABELS[category] ?? category.replace(/_/g, " ");
@@ -92,11 +93,14 @@ function isEvaluationNotApplicable(data: EvaluationResult): boolean {
 }
 
 function getCoachingRecommendations(data: CoachingReport, evaluation: EvaluationResult): RubricRecommendation[] {
-  if (evaluation.rubric_result?.recommendations.length) return evaluation.rubric_result.recommendations;
   if (data.rubric_coaching?.blocks.length) {
     return [...data.rubric_coaching.blocks]
       .sort((left, right) => left.display_order - right.display_order)
       .flatMap((block) => block.recommendations);
+  }
+  if (evaluation.rubric_result?.recommendations.length) return evaluation.rubric_result.recommendations;
+  if (data.rubric_recommendations_by_block && Object.keys(data.rubric_recommendations_by_block).length) {
+    return Object.values(data.rubric_recommendations_by_block).flat();
   }
   return data.rubric_recommendations ?? [];
 }
@@ -222,8 +226,8 @@ function StrengthsStep({ data }: { data: EvaluationResult }) {
   return (
     <div className="space-y-4">
       <ul className="space-y-3">
-        {data.strengths.map((s, i) => (
-          <li key={i} className="rounded-xl border border-[#22C55E]/20 bg-[#22C55E]/5 p-4">
+        {data.strengths.map((s) => (
+          <li key={`${s.category}-${s.description}-${s.transcript_excerpt}`} className="min-w-0 rounded-xl border border-[#22C55E]/20 bg-[#22C55E]/5 p-4 [overflow-wrap:anywhere]">
             <p className="text-sm font-medium text-foreground">{s.description}</p>
             <p className="mt-1 text-xs text-muted-foreground">
               {formatCategoryLabel(s.category)}
@@ -257,8 +261,8 @@ function WeaknessesStep({ data }: { data: EvaluationResult }) {
   return (
     <div className="space-y-4">
       <ul className="space-y-3">
-        {data.weaknesses.map((w, i) => (
-          <li key={i} className="rounded-xl border border-[#EF4444]/20 bg-[#EF4444]/5 p-4">
+        {data.weaknesses.map((w) => (
+          <li key={`${w.category}-${w.description}-${w.transcript_excerpt}`} className="min-w-0 rounded-xl border border-[#EF4444]/20 bg-[#EF4444]/5 p-4 [overflow-wrap:anywhere]">
             <p className="text-sm font-medium text-foreground">{w.description}</p>
             <p className="mt-1 text-xs text-muted-foreground">
               {formatCategoryLabel(w.category)}
@@ -332,10 +336,10 @@ function LearningPlanStep({ data, passingScore, notApplicable }: { data: Learnin
         {data.weak_competencies.map((item: LearningPlanItem) => (
           <li
             key={`${item.rubric_block_id ?? item.category}-${item.criterion_id ?? "category"}`}
-            className="flex items-center justify-between gap-3 rounded-xl border border-border p-4"
+            className="flex min-w-0 flex-col items-stretch gap-3 rounded-xl border border-border p-4 sm:flex-row sm:items-center sm:justify-between [overflow-wrap:anywhere]"
           >
             <div className="min-w-0 space-y-1">
-              <p className="text-sm font-medium text-foreground">
+              <p className="min-w-0 text-sm font-medium text-foreground">
                 {formatCategoryLabel(item.category)}
               </p>
               <p className="text-xs text-muted-foreground">
@@ -351,8 +355,8 @@ function LearningPlanStep({ data, passingScore, notApplicable }: { data: Learnin
               )}
             </div>
             {item.scenario_id && isValidScenarioId(item.scenario_id) && (
-              <Link href={`/sessions/new?scenario_id=${encodeURIComponent(item.scenario_id)}`}>
-                <Button variant="outline" size="sm">
+              <Link className="w-full sm:w-auto" href={`/sessions/new?scenario_id=${encodeURIComponent(item.scenario_id)}`}>
+                <Button variant="outline" size="sm" className="min-h-11 w-full sm:w-auto" aria-label={`Practice ${formatCategoryLabel(item.category)}`}>
                   Practice
                   <ArrowRight className="h-4 w-4" />
                 </Button>
@@ -461,8 +465,8 @@ function SummaryStep({ data, coaching, learningPlan }: { data: EvaluationResult;
               <p className="text-sm font-bold text-foreground">Strengths</p>
             </div>
             <ul className="space-y-1.5">
-              {data.strengths.map((s, i) => (
-                <li key={i} className="text-sm text-foreground">
+              {data.strengths.map((s) => (
+                <li key={`${s.category}-${s.description}-${s.transcript_excerpt}`} className="min-w-0 break-words text-sm text-foreground [overflow-wrap:anywhere]">
                   <span className="text-[#22C55E] mr-1">✓</span> {s.description}
                 </li>
               ))}
@@ -478,8 +482,8 @@ function SummaryStep({ data, coaching, learningPlan }: { data: EvaluationResult;
               <p className="text-sm font-bold text-foreground">Needs Work</p>
             </div>
             <ul className="space-y-1.5">
-              {data.weaknesses.map((w, i) => (
-                <li key={i} className="text-sm text-foreground">
+              {data.weaknesses.map((w) => (
+                <li key={`${w.category}-${w.description}-${w.transcript_excerpt}`} className="min-w-0 break-words text-sm text-foreground [overflow-wrap:anywhere]">
                   <span className="text-[#EF4444] mr-1">!</span> {w.description}
                 </li>
               ))}
@@ -530,10 +534,10 @@ function SummaryStep({ data, coaching, learningPlan }: { data: EvaluationResult;
         {/* Actions — 2 col */}
         <div className="col-span-2 sm:col-span-2 grid grid-cols-2 gap-3 pt-1">
           <Link href="/sessions" className="block">
-            <Button variant="outline" className="w-full" size="lg">All Sessions</Button>
+            <Button variant="outline" className="min-h-11 w-full" size="lg">All Sessions</Button>
           </Link>
           <Link href="/scenarios" className="block">
-            <Button className="w-full" size="lg">Train another scenario</Button>
+            <Button className="min-h-11 w-full" size="lg">Train another scenario</Button>
           </Link>
         </div>
       </div>
@@ -554,7 +558,7 @@ function ErrorState({ title, error, onRetry }: { title: string; error: Error | n
         <AlertCircle className="mx-auto h-8 w-8 text-[#EF4444]" />
         <h2 className="text-lg font-medium text-foreground">Couldn&apos;t load {title}</h2>
         <p className="text-sm text-muted-foreground">{safeArtifactErrorMessage(title, error)}</p>
-        {canRetry && <Button variant="outline" size="sm" onClick={onRetry}>Try again</Button>}
+        {canRetry && <Button variant="outline" size="sm" className="min-h-11" onClick={onRetry}>Try again</Button>}
       </div>
     </div>
   );
@@ -691,6 +695,8 @@ export default function SessionResultsPage({
           )}
           ref={stepContentRef}
           tabIndex={-1}
+          role="region"
+          aria-labelledby={`results-step-${step}-heading`}
           aria-live="polite"
         >
           <div className="w-full">
@@ -718,9 +724,12 @@ export default function SessionResultsPage({
         /* Content-heavy steps: fixed header + scrollable content */
         <>
           <div
+            id={`results-step-${step}-content`}
             key={step}
             ref={stepContentRef}
             tabIndex={-1}
+            role="region"
+            aria-labelledby={`results-step-${step}-heading`}
             aria-live="polite"
             className="motion-safe:animate-in motion-safe:fade-in-0 motion-safe:slide-in-from-right-4 motion-safe:duration-300 w-full max-w-4xl mx-auto focus-visible:outline-none"
           >

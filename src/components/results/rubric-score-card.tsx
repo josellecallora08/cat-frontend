@@ -43,9 +43,9 @@ export function RubricScoreCard({ category, transcript = [] }: RubricScoreCardPr
         Calculation: {category.raw_score === null ? "not applicable" : `${category.penalized_score} × ${category.weight}% ÷ 100 = ${category.weighted_contribution.toFixed(2)}`} · Final category score: <strong>{scoreLabel}</strong>
       </p>
 
-      {category.failed_criteria.length > 0 && <div><h4 className="text-sm font-semibold text-foreground">Failed criteria</h4><ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-muted-foreground">{category.failed_criteria.map((criterion) => <li key={criterion}>{criterion}</li>)}</ul></div>}
-      {category.strengths.length > 0 && <div><h4 className="text-sm font-semibold text-foreground">Strengths</h4><ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-muted-foreground">{category.strengths.map((strength) => <li key={`${strength.criterion_id}-${strength.explanation}`}>{strength.explanation}</li>)}</ul></div>}
-      {category.violations.length > 0 && <div><h4 className="text-sm font-semibold text-foreground">Violations</h4><ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-muted-foreground">{category.violations.map((violation) => <li key={`${violation.violation_id}-${violation.explanation}`}>{violation.explanation}</li>)}</ul></div>}
+      {category.failed_criteria.length > 0 && <div><h4 className="text-sm font-semibold text-foreground">Failed criteria</h4><ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-muted-foreground">{category.failed_criteria.map((criterion) => <li key={`${category.rubric_block_id}-${criterion}`}>{criterion}</li>)}</ul></div>}
+      {category.strengths.length > 0 && <div><h4 className="text-sm font-semibold text-foreground">Strengths</h4><ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-muted-foreground">{category.strengths.map((strength) => <li key={`${category.rubric_block_id}-${strength.criterion_id}-${strength.evidence_sequence_numbers.join(",")}`}>{strength.explanation}</li>)}</ul></div>}
+      {category.violations.length > 0 && <div><h4 className="text-sm font-semibold text-foreground">Violations</h4><ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-muted-foreground">{category.violations.map((violation) => <li key={`${category.rubric_block_id}-${violation.violation_id}-${violation.evidence_sequence_numbers.join(",")}`}>{violation.explanation}</li>)}</ul></div>}
       <TranscriptEvidence evidence={category.evidence} transcript={transcript} />
     </article>
   );

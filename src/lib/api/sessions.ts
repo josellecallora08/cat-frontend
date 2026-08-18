@@ -559,8 +559,8 @@ function validateCanonicalResult(value: unknown): value is CanonicalEvaluationRe
     || typeof value.passed !== "boolean" || !validateTechniqueEnvelope(value.applied_techniques)
     || !validateMissedEnvelope(value.missed_opportunities) || !validateRecommendationList(value.recommendations)) return false;
   const categories = value.categories;
-  if (!categories.every((category) => validateCanonicalCategory(category, value.status))) return false;
-  const blockIds = new Set(categories.map((category) => String((category as UnknownRecord).rubric_block_id)));
+  if (!categories.every((category) => validateCanonicalCategory(category, value.status as CanonicalEvaluationResult["status"]))) return false;
+  const blockIds = new Set(categories.map((category) => String((category as unknown as UnknownRecord).rubric_block_id)));
   if (blockIds.size !== categories.length) return false;
   if (value.status === "not_applicable" && (value.passed || value.weighted_total !== 0 || value.recommendations.length > 0)) return false;
   return value.recommendations.every((recommendation) => {
@@ -647,7 +647,7 @@ function parseEvaluationResult(payload: unknown, expectedSessionId?: string): Ev
     || !payload.weaknesses.every((item) => isRecord(item) && isNonEmptyString(item.description) && isNonEmptyString(item.category) && isNonEmptyString(item.transcript_excerpt))
     || typeof payload.is_too_short !== "boolean") invalidResponse("Evaluation");
   if (payload.rubric_result !== undefined && payload.rubric_result !== null && !validateCanonicalResult(payload.rubric_result)) invalidResponse("Evaluation");
-  return payload as EvaluationResult;
+  return payload as unknown as EvaluationResult;
 }
 
 export async function fetchEvaluation(sessionId: string): Promise<EvaluationResult> {
