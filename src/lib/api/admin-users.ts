@@ -26,6 +26,7 @@ export interface AdminUserUpdatePayload {
 export interface AdminUserStatusPayload {
   is_active: boolean;
 }
+export interface AdminUserFilters { search?: string; role?: string; user_type?: string; is_active?: boolean; }
 
 export interface AdminPasswordResetPayload {
   new_password: string;
@@ -39,8 +40,14 @@ async function handleErrorResponse(response: Response): Promise<never> {
   throw new Error(message);
 }
 
-export async function fetchAdminUsers(token: string): Promise<AdminUser[]> {
-  const response = await fetch(`${API_BASE_URL}/api/admin/users`, {
+export async function fetchAdminUsers(token: string, filters: AdminUserFilters = {}): Promise<AdminUser[]> {
+  const params = new URLSearchParams();
+  if (filters.search?.trim()) params.set("search", filters.search.trim());
+  if (filters.role) params.set("role", filters.role);
+  if (filters.user_type) params.set("user_type", filters.user_type);
+  if (filters.is_active !== undefined) params.set("is_active", String(filters.is_active));
+  const query = params.toString();
+  const response = await fetch(`${API_BASE_URL}/api/admin/users${query ? `?${query}` : ""}`, {
     headers: {
       Authorization: `Bearer ${token}`,
     },

@@ -80,7 +80,7 @@ export function FilterTabs({ tabs, activeTab, onChange, className }: FilterTabsP
       role="tablist"
       aria-label="Filter options"
       className={cn(
-        "relative flex flex-wrap items-center gap-1 rounded-xl bg-muted p-1",
+        "relative flex flex-wrap items-center gap-1 rounded-xl p-1",
         className,
       )}
     >

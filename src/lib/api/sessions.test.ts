@@ -74,7 +74,7 @@ describe("criteria-based coaching completion bug-condition exploration", () => {
   ] as const;
 
   it.each(endpoints)("sends the stored bearer token for %s", async (_, fetchArtifact) => {
-    window.localStorage.setItem("cat_token", "exploration-token");
+    window.localStorage.setItem("cat_token", "test-token-marker");
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response(
       fetchArtifact === fetchTranscript ? [] : fetchArtifact === fetchEvaluation ? validEvaluation : fetchArtifact === fetchCoaching ? validCoaching : validPlan,
     )));
@@ -82,7 +82,7 @@ describe("criteria-based coaching completion bug-condition exploration", () => {
     await fetchArtifact("session-1");
 
     const request = vi.mocked(fetch).mock.calls[0]?.[1] as RequestInit | undefined;
-    expect(new Headers(request?.headers).get("Authorization")).toBe("Bearer exploration-token");
+    expect(new Headers(request?.headers).get("Authorization")).toBe("Bearer test-token-marker");
     expect(request?.method ?? "GET").toBe("GET");
   });
 

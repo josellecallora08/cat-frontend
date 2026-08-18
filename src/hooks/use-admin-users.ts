@@ -14,14 +14,15 @@ import type {
   AdminUserUpdatePayload,
   AdminUserStatusPayload,
   AdminPasswordResetPayload,
+  AdminUserFilters,
 } from "@/lib/api/admin-users";
 
-export function useAdminUsers() {
+export function useAdminUsers(filters: AdminUserFilters = {}) {
   const token = useAuthStore((s) => s.token);
 
   return useQuery({
-    queryKey: ["admin-users"],
-    queryFn: () => fetchAdminUsers(token ?? ""),
+    queryKey: ["admin-users", filters],
+    queryFn: () => fetchAdminUsers(token ?? "", filters),
   });
 }
 

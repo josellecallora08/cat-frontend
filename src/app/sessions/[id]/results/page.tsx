@@ -1,41 +1,46 @@
 "use client";
 
-import { use, useState, useRef, useEffect } from "react";
-import Link from "next/link";
-import {
-  useEvaluation,
-  useCoaching,
-  useLearningPlan,
-  useTranscript,
-} from "@/hooks/use-session-results";
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
-import {
-  CheckCircle2,
-  AlertTriangle,
-  Trophy,
-  ThumbsUp,
-  AlertCircle,
-  ArrowRight,
-  ArrowLeft,
-} from "lucide-react";
 import { CatMascotSvg } from "@/components/auth/CatMascotSvg";
-import { OrangeCatMascot } from "@/components/results/OrangeCatMascot";
+import { PrintReportSection } from "@/components/results/print-report-section";
 import { RecommendationPanel } from "@/components/results/recommendation-panel";
+import { ReportShell } from "@/components/results/report-shell";
 import { RubricScoreCard } from "@/components/results/rubric-score-card";
-import type { CatEmotion } from "@/components/results/OrangeCatMascot";
-import confetti from "canvas-confetti";
-import { isValidScenarioId, SessionArtifactError } from "@/lib/api/sessions";
+import { Button } from "@/components/ui/button";
+import { useReport } from "@/hooks/use-report";
+import {
+    useCoaching,
+    useEvaluation,
+    useLearningPlan,
+    useTranscript,
+} from "@/hooks/use-session-results";
 import type {
-  EvaluationResult,
-  CoachingReport,
-  LearningPlan,
-  CompetencyScore,
-  MistakeItem,
-  LearningPlanItem,
-  TranscriptEntry,
-  RubricRecommendation,
+    CoachingReport,
+    CompetencyScore,
+    EvaluationResult,
+    LearningPlan,
+    LearningPlanItem,
+    MistakeItem,
+    RubricRecommendation,
+    TranscriptEntry,
 } from "@/lib/api/sessions";
+import type { NormalizedReport, ReportSectionName } from "@/types/report";
+import {
+    isValidScenarioId,
+    retryEvaluationGeneration,
+    SessionArtifactError,
+} from "@/lib/api/sessions";
+import { cn } from "@/lib/utils";
+import confetti from "canvas-confetti";
+import {
+    AlertCircle,
+    AlertTriangle,
+    ArrowRight,
+    CheckCircle2,
+    ThumbsUp,
+    Trophy,
+} from "lucide-react";
+import Link from "next/link";
+import { use, useEffect, useRef, useState } from "react";
 
 const CATEGORY_LABELS: Record<string, string> = {
   call_opening: "Call Opening",
@@ -140,75 +145,14 @@ function CatLoading() {
   );
 }
 
-// --- Step navigation bar ---
-function StepNav({
-  currentStep,
-  totalSteps,
-  onPrev,
-  onNext,
-  onStepClick,
-  nextLabel,
-}: {
-  currentStep: number;
-  totalSteps: number;
-  onPrev: () => void;
-  onNext: () => void;
-  onStepClick: (step: number) => void;
-  nextLabel?: string;
-}) {
-  return (
-    <nav data-results-navigation="true" aria-label="Results steps" className="grid w-full min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-1">
-      {currentStep === 0 ? (
-        <Link href="/sessions" className="min-w-0">
-          <Button variant="outline" size="sm" className="min-h-11 min-w-0 gap-1 px-2 sm:gap-1.5 sm:px-2.5">
-            <ArrowLeft className="h-4 w-4 shrink-0" />
-            <span className="truncate">All Sessions</span>
-          </Button>
-        </Link>
-      ) : (
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={onPrev}
-          className="min-h-11 min-w-0 gap-1 px-2 sm:gap-1.5 sm:px-2.5"
-        >
-          <ArrowLeft className="h-4 w-4 shrink-0" />
-          <span>Back</span>
-        </Button>
-      )}
-      <div className="flex min-w-0 flex-wrap items-center justify-center gap-0" role="list" aria-label="Result steps">
-        {STEP_KEYS.slice(0, totalSteps).map((stepKey, i) => (
-          <button
-            key={stepKey}
-            type="button"
-            onClick={() => onStepClick(i)}
-            className="flex min-h-11 min-w-11 items-center justify-center rounded-full px-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-            aria-label={`Go to step ${i + 1}`}
-            aria-current={i === currentStep ? "step" : undefined}
-          >
-            <span className={cn(
-              "block rounded-full transition-all duration-300 motion-reduce:transition-none",
-              i === currentStep ? "h-2 w-6 bg-[#8F6AE0]" : "h-2 w-2 bg-[#8F6AE0]/20 hover:bg-[#8F6AE0]/40"
-            )} />
-          </button>
-        ))}
-      </div>
-      <Button size="sm" onClick={onNext} className="min-h-11 min-w-0 gap-1 px-2 sm:gap-1.5 sm:px-2.5">
-        <span className="truncate">{nextLabel ?? "Next"}</span>
-        <ArrowRight className="h-4 w-4 shrink-0" />
-      </Button>
-    </nav>
-  );
-}
-
 // --- Step 1: Evaluation scores ---
 function EvaluationStep({ data, transcript }: { data: EvaluationResult; transcript: TranscriptEntry[] }) {
   const canonical = data.rubric_result;
   if (canonical?.status === "not_applicable") {
-    return <div role="status" className="space-y-3 rounded-xl border border-[#F59E0B]/30 bg-[#F59E0B]/5 p-5 text-sm text-muted-foreground"><StandardContext data={data} /><p>Evaluation not applicable: {canonical.summary}</p></div>;
+    return <div role="status" className="space-y-3 rounded-xl border border-[#F59E0B]/30 bg-[#F59E0B]/5 p-5 text-sm text-muted-foreground"><p>Evaluation not applicable: {canonical.summary}</p></div>;
   }
   if (canonical?.categories.length) {
-    return <div className="space-y-4"><StandardContext data={data} />{canonical.categories.map((category) => <RubricScoreCard key={category.rubric_block_id} category={category} transcript={transcript} />)}</div>;
+    return <div className="space-y-4">{canonical.categories.map((category) => <RubricScoreCard key={category.rubric_block_id} category={category} transcript={transcript} />)}</div>;
   }
 
   return (
@@ -216,9 +160,56 @@ function EvaluationStep({ data, transcript }: { data: EvaluationResult; transcri
       <StandardContext data={data} />
       {data.is_too_short && <div className="flex items-center gap-3 rounded-xl border border-[#F59E0B]/30 bg-[#F59E0B]/5 px-4 py-3"><AlertTriangle className="h-4 w-4 text-[#F59E0B]" aria-hidden="true" /><p className="text-xs text-muted-foreground text-left">Short session — scores may be less accurate with fewer turns.</p></div>}
       <div className="space-y-4">
-        {data.category_scores.map((item: CompetencyScore) => <div key={item.category} className="space-y-1.5"><div className="flex justify-between text-sm"><span className="font-medium text-foreground">{formatCategoryLabel(item.category)}</span><span className="text-muted-foreground">{item.score}/100{formatWeight(item.category) && ` · ${formatWeight(item.category)}`}</span></div><div className="h-2.5 w-full overflow-hidden rounded-full bg-muted"><div className={cn("h-full rounded-full transition-all", scoreToneBar(item.score))} style={{ width: `${item.score}%` }} /></div></div>)}
+        {data.category_scores.map((item: CompetencyScore) => <div key={item.category} className="space-y-1.5"><div className="flex justify-between text-sm"><span className="font-medium text-foreground">{formatCategoryLabel(item.category)}</span><span className="text-muted-foreground">{item.score}/100{formatWeight(item.category) && ` · ${formatWeight(item.category)}`}</span></div><div className="h-2.5 w-full overflow-hidden rounded-full bg-muted"><div role="img" aria-label={`${formatCategoryLabel(item.category)} score: ${item.score} out of 100`} className={cn("h-full rounded-full transition-all motion-reduce:transition-none", scoreToneBar(item.score))} style={{ width: `${item.score}%` }}><span className="sr-only">{item.score} out of 100</span></div></div></div>)}
       </div>
     </div>
+  );
+}
+
+function TranscriptStep({ entries, isLoading, error, onRetry }: { entries: TranscriptEntry[]; isLoading: boolean; error: Error | null; onRetry: () => void }) {
+  if (isLoading) return <ArtifactLoading label="transcript" />;
+  if (error) return <ErrorState title="transcript" error={error} onRetry={onRetry} />;
+  if (entries.length === 0) return <p className="rounded-xl border border-border p-5 text-sm text-muted-foreground">No transcript was recorded.</p>;
+  return (
+    <div className="rounded-2xl border border-border bg-muted/20 p-3 sm:p-5" aria-label="Conversation transcript">
+      <div className="space-y-4">
+        {entries.map((entry) => {
+          const isAgent = entry.speaker === "agent";
+          return (
+            <article key={`${entry.sequence_number}-${entry.timestamp}`} className={`flex ${isAgent ? "justify-end" : "justify-start"}`}>
+              <div className={`flex max-w-[88%] flex-col gap-1 sm:max-w-[75%] ${isAgent ? "items-end" : "items-start"}`}>
+                <div className="flex items-center gap-2 px-1 text-xs text-muted-foreground">
+                  <span className="font-semibold text-foreground">{isAgent ? "You" : "Customer"}</span>
+                  <time>{entry.timestamp}</time>
+                </div>
+                <div className={`rounded-2xl px-4 py-3 text-sm leading-6 shadow-sm ${isAgent ? "rounded-br-sm bg-primary text-primary-foreground" : "rounded-bl-sm border border-border bg-card text-foreground"}`}>
+                  {entry.text}
+                </div>
+              </div>
+            </article>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function MetadataStep({ report }: { report: NormalizedReport | null }) {
+  if (!report) return <p className="rounded-xl border border-border p-5 text-sm text-muted-foreground">Session metadata is unavailable.</p>;
+  const session = report.session ?? {};
+  const value = (key: string, fallback: string) => typeof session[key] === "string" ? session[key] as string : fallback;
+  return (
+    <dl className="grid gap-3 sm:grid-cols-2">
+      {[
+        ["Session ID", report.session_id],
+        ["Scenario", value("scenario_name", value("scenario", "Unavailable"))],
+        ["Participant", value("user_name", value("agent_name", "Unavailable"))],
+        ["Report status", report.report_status],
+        ["Score status", report.score_status],
+        ["Evaluation", report.evaluation_version.name ?? (report.evaluation_kind === "legacy" ? "Legacy evaluation" : "Current evaluation")],
+        ["Version", report.evaluation_version.number?.toString() ?? "Unavailable"],
+      ].map(([label, content]) => <div key={label} className="rounded-xl border border-border p-4"><dt className="text-xs uppercase tracking-wide text-muted-foreground">{label}</dt><dd className="mt-1 text-sm font-medium text-foreground">{content}</dd></div>)}
+    </dl>
   );
 }
 
@@ -453,9 +444,9 @@ function SummaryStep({ data, coaching, learningPlan }: { data: EvaluationResult;
     <div className="space-y-4 w-full max-w-2xl mx-auto">
       <StandardContext data={data} />
       {/* Bento grid */}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {/* Overall score — spans full width */}
-        <div className="col-span-2 p-3 text-center">
+        <div className="col-span-2 sm:col-span-2 p-3 text-center">
           <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Overall Score</p>
           <p className={cn("mt-1 text-4xl font-bold leading-none", scoreToneText(overall ?? 0))}>
             {Math.round(overall ?? 0)}<span className="text-base font-medium text-muted-foreground">/100</span>
@@ -468,7 +459,7 @@ function SummaryStep({ data, coaching, learningPlan }: { data: EvaluationResult;
 
         {/* Strengths — spans full width */}
         {data.strengths && data.strengths.length > 0 && (
-          <div className="col-span-2 rounded-2xl bg-[#22C55E]/5 border border-[#22C55E]/20 p-4 space-y-2">
+          <div className="col-span-2 sm:col-span-2 rounded-2xl bg-[#22C55E]/5 border border-[#22C55E]/20 p-4 space-y-2">
             <div className="flex items-center gap-1.5">
               <ThumbsUp className="h-4 w-4 text-[#22C55E]" />
               <p className="text-sm font-bold text-foreground">Strengths</p>
@@ -485,7 +476,7 @@ function SummaryStep({ data, coaching, learningPlan }: { data: EvaluationResult;
 
         {/* Areas for improvement — spans full width */}
         {data.weaknesses && data.weaknesses.length > 0 && (
-          <div className="col-span-2 rounded-2xl bg-[#EF4444]/5 border border-[#EF4444]/20 p-4 space-y-2">
+          <div className="col-span-2 sm:col-span-2 rounded-2xl bg-[#EF4444]/5 border border-[#EF4444]/20 p-4 space-y-2">
             <div className="flex items-center gap-1.5">
               <AlertTriangle className="h-4 w-4 text-[#EF4444]" />
               <p className="text-sm font-bold text-foreground">Needs Work</p>
@@ -534,14 +525,14 @@ function SummaryStep({ data, coaching, learningPlan }: { data: EvaluationResult;
 
         {/* All passing state */}
         {coaching?.no_mistakes && learningPlan?.all_passing && (
-          <div className="col-span-2 rounded-2xl bg-[#22C55E]/5 border border-[#22C55E]/20 p-4 text-center">
+          <div className="col-span-2 sm:col-span-2 rounded-2xl bg-[#22C55E]/5 border border-[#22C55E]/20 p-4 text-center">
             <Trophy className="mx-auto h-5 w-5 text-[#22C55E]" />
             <p className="mt-1 text-sm font-medium text-[#22C55E]">Perfect session — no issues found!</p>
           </div>
         )}
 
         {/* Actions — 2 col */}
-        <div className="col-span-2 grid grid-cols-1 gap-3 pt-1 sm:grid-cols-2">
+        <div className="col-span-2 sm:col-span-2 grid grid-cols-2 gap-3 pt-1">
           <Link href="/sessions" className="block">
             <Button variant="outline" className="min-h-11 w-full" size="lg">All Sessions</Button>
           </Link>
@@ -580,46 +571,96 @@ export default function SessionResultsPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
-  const evaluation = useEvaluation(id);
-  const transcript = useTranscript(id);
-  const coaching = useCoaching(id);
-  const learningPlan = useLearningPlan(id);
+  const reportState = useReport(id);
+  const useLegacyArtifacts = reportState.isError;
+  const evaluation = useEvaluation(id, useLegacyArtifacts);
+  const transcript = useTranscript(id, useLegacyArtifacts);
+  const coaching = useCoaching(id, useLegacyArtifacts);
+  const learningPlan = useLearningPlan(id, useLegacyArtifacts);
+  const reportSections = reportState.report?.sections;
+  const reportEvaluation = reportSections?.evaluation.state === "loaded"
+    ? reportSections.evaluation.data as EvaluationResult
+    : null;
+  const reportTranscript = reportSections?.transcript.state === "loaded"
+    ? reportSections.transcript.data as TranscriptEntry[]
+    : null;
+  const reportCoaching = reportSections?.coaching.state === "loaded"
+    ? reportSections.coaching.data as CoachingReport
+    : null;
+  const reportLearningPlan = reportSections?.learning_plan.state === "loaded"
+    ? reportSections.learning_plan.data as LearningPlan
+    : null;
+  const evaluationData = reportEvaluation ?? evaluation.data;
+  const transcriptData = reportTranscript ?? transcript.data ?? [];
+  const coachingData = reportCoaching ?? coaching.data ?? null;
+  const learningPlanData = reportLearningPlan ?? learningPlan.data ?? null;
   const [step, setStep] = useState(0);
+  const [isRegenerating, setIsRegenerating] = useState(false);
+  const [regenerationError, setRegenerationError] = useState<string | null>(null);
   const stepContentRef = useRef<HTMLDivElement>(null);
+
+  const regenerateResults = async () => {
+    if (isRegenerating) return;
+    setIsRegenerating(true);
+    setRegenerationError(null);
+    try {
+      await retryEvaluationGeneration(id);
+      await reportState.retryAll();
+    } catch {
+      setRegenerationError("Evaluation generation failed. Please try again.");
+    } finally {
+      setIsRegenerating(false);
+    }
+  };
 
   useEffect(() => {
     stepContentRef.current?.focus();
   }, [step]);
 
-  const TOTAL_STEPS = 7;
-
   // Evaluation is the primary artifact; other panels render independently as they arrive.
-  if (evaluation.isLoading) {
+  if (reportState.isLoading || (!reportState.report && evaluation.isLoading)) {
     return <CatLoading />;
   }
 
-  // Show error if evaluation failed (primary data)
-  if (evaluation.isError) {
+  // The aggregate report is authoritative; only fall back to the legacy query when it is unavailable.
+  if (useLegacyArtifacts && evaluation.isError) {
     return <ErrorState title="evaluation" error={evaluation.error} onRetry={() => evaluation.refetch()} />;
   }
 
-  if (!evaluation.data) {
+  if (!evaluationData) {
+    const sectionFailure = reportSections?.evaluation.failure;
+    if (sectionFailure) {
+      return <ErrorState title="evaluation" error={new Error(sectionFailure.safe_message)} onRetry={() => { void reportState.retrySection("evaluation"); }} />;
+    }
+    if (reportSections?.evaluation.state === "empty") {
+      return (
+        <div className="flex min-h-screen items-center justify-center px-4">
+          <div className="max-w-md space-y-4 text-center">
+            <AlertCircle className="mx-auto h-8 w-8 text-[#F59E0B]" />
+            <h1 className="text-lg font-medium text-foreground">Results were not generated</h1>
+            <p className="text-sm text-muted-foreground">
+              The session and transcript were saved, but evaluation processing did not finish.
+            </p>
+            {regenerationError && <p role="alert" className="text-sm text-destructive">{regenerationError}</p>}
+            <Button onClick={() => { void regenerateResults(); }} disabled={isRegenerating}>
+              {isRegenerating ? "Generating results…" : "Generate results again"}
+            </Button>
+          </div>
+        </div>
+      );
+    }
     return <CatLoading />;
   }
 
-  const goNext = () => setStep((s) => Math.min(s + 1, TOTAL_STEPS - 1));
-  const goPrev = () => setStep((s) => Math.max(s - 1, 0));
-
-  // Map step index to cat emotion
-  const stepEmotions: CatEmotion[] = [
-    "neutral",      // 0: Evaluation scores
-    "happy",        // 1: Strengths
-    "worried",      // 2: Weaknesses
-    "thinking",     // 3: Coaching
-    "encouraging",  // 4: Learning plan
-    isEvaluationNotApplicable(evaluation.data) ? "neutral" : getOverallScore(evaluation.data) >= getPassingThreshold(evaluation.data) ? "celebrating" : "encouraging", // 5: Overall score
-    "proud",        // 6: Summary
-  ];
+  const sectionForStep: ReportSectionName[] = ["evaluation", "summary", "summary", "coaching", "learning_plan", "summary", "summary", "transcript", "metadata"];
+  const stepForSection: Partial<Record<ReportSectionName, number>> = {
+    metadata: 8,
+    transcript: 7,
+    evaluation: 0,
+    coaching: 3,
+    learning_plan: 4,
+    summary: 6,
+  };
 
   // Step titles and descriptions
   const stepMeta: { title: string; description: string }[] = [
@@ -630,24 +671,27 @@ export default function SessionResultsPage({
     { title: "Learning Plan", description: "Criterion-specific practice focus" },
     { title: "Overall Score", description: "Your final performance rating" },
     { title: "Session Complete", description: "Full performance breakdown" },
+    { title: "Transcript", description: "Review the conversation" },
+    { title: "Metadata", description: "Session and evaluation details" },
   ];
 
   // Steps that have short content and can fit in 1 centered div
   const isCompactStep = step === 0 || step === 1 || step === 4 || step === 5;
 
   return (
-    <div data-results-page="true" className="flex min-h-screen min-w-0 flex-col overflow-x-hidden px-4 py-6">
-      <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
-        Step {step + 1} of {TOTAL_STEPS}: {stepMeta[step].title}
-      </p>
+    <ReportShell report={reportState.report} reportError={reportState.metadata.error ?? null} sessionId={id} onRetry={() => { void reportState.retryAll(); }} onRetrySection={(name) => { void reportState.retrySection(name); }} activeSection={sectionForStep[step]} onSectionSelect={(name) => { const target = stepForSection[name]; if (target !== undefined) setStep(target); }} headerTitle={stepMeta[step].title} headerDescription={stepMeta[step].description}>
+      <div className="report-print-root flex flex-col overflow-x-hidden px-4 py-6">
+      <PrintReportSection
+        className="flex min-h-0 flex-1 flex-col"
+        sectionName={stepMeta[step].title}
+      >
       {isCompactStep ? (
         /* Compact steps: everything in one vertically-centered div */
         <div
           key={step}
-          id={`results-step-${step}`}
-          className={cn(
-            "min-h-0 min-w-0 flex-1 overflow-y-auto flex flex-col justify-start py-2 items-center motion-safe:animate-in motion-safe:fade-in-0 motion-safe:slide-in-from-right-4 motion-safe:duration-300 motion-reduce:animate-none w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-            step < 6 && "max-w-lg mx-auto"
+            className={cn(
+            "flex flex-col justify-start py-2 items-center motion-safe:animate-in motion-safe:fade-in-0 motion-safe:slide-in-from-right-4 motion-safe:duration-300 w-full",
+            step < 6 && "max-w-4xl mx-auto"
           )}
           ref={stepContentRef}
           tabIndex={-1}
@@ -655,48 +699,30 @@ export default function SessionResultsPage({
           aria-labelledby={`results-step-${step}-heading`}
           aria-live="polite"
         >
-          <h2 id={`results-step-${step}-heading`} className="text-xl md:text-2xl font-bold text-foreground text-center">
-            {stepMeta[step].title}
-          </h2>
-          <p className="text-sm text-muted-foreground text-center mt-1 mb-3">
-            {stepMeta[step].description}
-          </p>
-          <div className="flex justify-center mb-3">
-            <OrangeCatMascot emotion={stepEmotions[step]} className="w-16 h-16 md:w-20 md:h-20" />
-          </div>
           <div className="w-full">
             {step === 0 && (
-              transcript.isLoading ? <ArtifactLoading label="transcript" />
+              useLegacyArtifacts && transcript.isLoading ? <ArtifactLoading label="transcript" />
                 : transcript.isError ? <ErrorState title="transcript" error={transcript.error} onRetry={() => transcript.refetch()} />
-                  : <EvaluationStep data={evaluation.data} transcript={transcript.data ?? []} />
+                  : <EvaluationStep data={evaluationData} transcript={transcriptData} />
             )}
-            {step === 1 && <StrengthsStep data={evaluation.data} />}
+            {step === 1 && <StrengthsStep data={evaluationData} />}
             {step === 4 && (
-              isEvaluationNotApplicable(evaluation.data) ? <LearningPlanStep data={learningPlan.data ?? { session_id: id, weak_competencies: [], all_passing: true }} passingScore={getPassingThreshold(evaluation.data)} notApplicable />
-                : learningPlan.isLoading ? <ArtifactLoading label="learning plan" />
+              isEvaluationNotApplicable(evaluationData) ? <LearningPlanStep data={learningPlanData ?? { session_id: id, weak_competencies: [], all_passing: true }} passingScore={getPassingThreshold(evaluationData)} notApplicable />
+                : useLegacyArtifacts && learningPlan.isLoading ? <ArtifactLoading label="learning plan" />
                   : learningPlan.isError ? (
                     <ErrorState title="learning plan" error={learningPlan.error} onRetry={() => learningPlan.refetch()} />
-                  ) : learningPlan.data ? (
-                    <LearningPlanStep data={learningPlan.data} passingScore={getPassingThreshold(evaluation.data)} notApplicable={false} />
+                  ) : learningPlanData ? (
+                    <LearningPlanStep data={learningPlanData} passingScore={getPassingThreshold(evaluationData)} notApplicable={false} />
                   ) : (
                     <p className="text-sm text-muted-foreground text-center py-8">Learning plan not available yet.</p>
                   )
             )}
-            {step === 5 && <OverallScoreStep data={evaluation.data} />}
+            {step === 5 && <OverallScoreStep data={evaluationData} />}
           </div>
         </div>
       ) : (
         /* Content-heavy steps: fixed header + scrollable content */
         <>
-          <h2 id={`results-step-${step}-heading`} className="text-xl md:text-2xl font-bold text-foreground text-center shrink-0">
-            {stepMeta[step].title}
-          </h2>
-          <p className="text-sm text-muted-foreground text-center mt-1 mb-3 shrink-0">
-            {stepMeta[step].description}
-          </p>
-          <div className="flex justify-center mb-3 shrink-0">
-            <OrangeCatMascot emotion={stepEmotions[step]} className="w-16 h-16 md:w-20 md:h-20" />
-          </div>
           <div
             id={`results-step-${step}-content`}
             key={step}
@@ -705,38 +731,29 @@ export default function SessionResultsPage({
             role="region"
             aria-labelledby={`results-step-${step}-heading`}
             aria-live="polite"
-            className="min-h-0 min-w-0 flex-1 overflow-y-auto motion-safe:animate-in motion-safe:fade-in-0 motion-safe:slide-in-from-right-4 motion-safe:duration-300 motion-reduce:animate-none w-full max-w-lg mx-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            className="motion-safe:animate-in motion-safe:fade-in-0 motion-safe:slide-in-from-right-4 motion-safe:duration-300 w-full max-w-4xl mx-auto focus-visible:outline-none"
           >
-            {step === 2 && <WeaknessesStep data={evaluation.data} />}
+            {step === 2 && <WeaknessesStep data={evaluationData} />}
             {step === 3 && (
-              isEvaluationNotApplicable(evaluation.data) ? <CoachingStep data={coaching.data ?? { session_id: id, mistakes_by_category: {}, total_mistakes: 0, no_mistakes: true }} evaluation={evaluation.data} notApplicable />
-                : coaching.isLoading ? <ArtifactLoading label="coaching report" />
+              isEvaluationNotApplicable(evaluationData) ? <CoachingStep data={coachingData ?? { session_id: id, mistakes_by_category: {}, total_mistakes: 0, no_mistakes: true }} evaluation={evaluationData} notApplicable />
+                : useLegacyArtifacts && coaching.isLoading ? <ArtifactLoading label="coaching report" />
                   : coaching.isError ? (
                     <ErrorState title="coaching report" error={coaching.error} onRetry={() => coaching.refetch()} />
-                  ) : coaching.data ? (
-                    <CoachingStep data={coaching.data} evaluation={evaluation.data} notApplicable={false} />
+                  ) : coachingData ? (
+                    <CoachingStep data={coachingData} evaluation={evaluationData} notApplicable={false} />
                   ) : (
                     <p className="text-sm text-muted-foreground text-center py-8">Coaching data not available yet.</p>
                   )
             )}
-            {step === 6 && <SummaryStep data={evaluation.data} coaching={coaching.data ?? null} learningPlan={learningPlan.data ?? null} />}
+            {step === 6 && <SummaryStep data={evaluationData} coaching={coachingData} learningPlan={learningPlanData} />}
+            {step === 7 && <TranscriptStep entries={transcriptData} isLoading={transcript.isLoading} error={transcript.isError ? transcript.error : null} onRetry={() => { void transcript.refetch(); }} />}
+            {step === 8 && <MetadataStep report={reportState.report} />}
           </div>
         </>
       )}
 
-      {/* Navigation — pinned at bottom */}
-      {step < TOTAL_STEPS - 1 && (
-        <div className="max-w-lg mx-auto w-full pt-4 shrink-0">
-          <StepNav
-            currentStep={step}
-            totalSteps={TOTAL_STEPS}
-            onPrev={goPrev}
-            onNext={goNext}
-            onStepClick={setStep}
-            nextLabel={step === TOTAL_STEPS - 2 ? "View Summary" : "Next"}
-          />
-        </div>
-      )}
+      </PrintReportSection>
     </div>
+    </ReportShell>
   );
 }

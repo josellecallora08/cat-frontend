@@ -191,6 +191,27 @@ export interface LearningPlan {
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
 
+export type DashboardSessionSortBy = "created_at" | "score" | "scenario" | "status";
+export type DashboardSessionSortDir = "asc" | "desc";
+
+export interface DashboardSessionRequestParams {
+  page: number;
+  page_size: number;
+  agent_id?: string;
+  status?: string;
+  search?: string;
+  sort_by?: DashboardSessionSortBy;
+  sort_dir?: DashboardSessionSortDir;
+}
+
+export function serializeDashboardSessionParams(params: DashboardSessionRequestParams): string {
+  const query = new URLSearchParams();
+  (Object.entries(params) as [keyof DashboardSessionRequestParams, string | number | undefined][]).forEach(([key, value]) => {
+    if (value !== undefined && value !== "") query.set(key, String(value));
+  });
+  return query.toString();
+}
+
 export type ArtifactErrorCategory =
   | "unauthorized"
   | "forbidden"
@@ -635,6 +656,20 @@ export async function fetchEvaluation(sessionId: string): Promise<EvaluationResu
     `/api/sessions/${sessionId}/evaluation`,
     (payload) => parseEvaluationResult(payload, sessionId),
   );
+}
+
+export async function retryEvaluationGeneration(sessionId: string): Promise<void> {
+  const token = typeof window !== "undefined"
+    ? window.localStorage?.getItem("cat_token") ?? null
+    : null;
+  const response = await fetch(
+    `${API_BASE_URL}/api/sessions/${sessionId}/evaluation/retry`,
+    {
+      method: "POST",
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    },
+  );
+  if (!response.ok) throw safeStatusError("evaluation", response.status);
 }
 
 export async function fetchCoaching(sessionId: string): Promise<CoachingReport> {

@@ -32,7 +32,7 @@ describe("NavigationShell script administration placement", () => {
         user_type: null,
         is_active: true,
       },
-      token: "admin-token",
+      token: "test-admin-token-marker",
     });
   });
 

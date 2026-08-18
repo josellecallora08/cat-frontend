@@ -8,7 +8,10 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:coverage": "vitest run --coverage",
+    "test:report": "vitest run --coverage src/components/results/report-accessibility.test.tsx src/components/results/report-export-control.test.tsx src/components/results/report-responsive-print-release-gate.test.tsx src/components/results/report-section.test.tsx src/components/results/report-shell.test.tsx src/components/results/print-report-section.test.tsx src/hooks/use-report.property.test.tsx src/lib/api/report.test.ts src/lib/report-csv.test.ts",
+    "test:watch": "vitest",
+    "release:gate": "node scripts/release-gate.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.5.0",
@@ -41,6 +44,7 @@
     "@types/react-dom": "^19",
     "@types/webrtc": "^0.0.47",
     "@vitejs/plugin-react": "^6.0.2",
+    "@vitest/coverage-v8": "^4.1.8",
     "eslint": "^9",
     "eslint-config-next": "16.2.9",
     "jsdom": "^29.1.1",

@@ -1,6 +1,6 @@
-import { Suspense } from "react";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { Suspense } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -15,6 +15,14 @@ vi.mock("react", async () => {
   const actual = await vi.importActual<typeof import("react")>("react");
   return { ...actual, use: () => ({ id: "session-1" }) };
 });
+
+vi.mock("@/hooks/use-report", () => ({
+  useReport: () => ({ report: null, metadata: { error: null }, retryAll: vi.fn(), retrySection: vi.fn() }),
+}));
+
+vi.mock("@/hooks/use-report", () => ({
+  useReport: () => ({ report: null, metadata: { error: null }, retryAll: vi.fn(), retrySection: vi.fn() }),
+}));
 
 vi.mock("@/hooks/use-session-results", () => ({
   useEvaluation: () => mocks.evaluation,

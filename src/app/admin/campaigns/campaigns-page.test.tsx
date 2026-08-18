@@ -277,18 +277,31 @@ describe("AdminCampaignsPage", () => {
     });
   });
 
-  it("filter tabs are rendered", async () => {
+  it("filter tabs use an unfilled row and move the active pill", async () => {
+    const user = userEvent.setup();
     renderWithProviders(<AdminCampaignsPage />);
 
     await waitFor(() => {
       expect(screen.getByText("Q1 Training")).toBeInTheDocument();
     });
 
-    expect(screen.getByRole("tab", { name: "All" })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "Draft" })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "Active" })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "Completed" })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "Archived" })).toBeInTheDocument();
+    const tablist = screen.getByRole("tablist", { name: "Filter options" });
+    const allTab = screen.getByRole("tab", { name: "All" });
+    const draftTab = screen.getByRole("tab", { name: "Draft" });
+
+    expect(tablist).not.toHaveClass("bg-muted");
+    expect(allTab).toHaveAttribute("aria-selected", "true");
+    expect(draftTab).toHaveAttribute("aria-selected", "false");
+
+    const activePill = tablist.querySelector("span[aria-hidden='true']");
+    expect(activePill).toHaveClass("bg-background", "rounded-lg", "shadow-sm");
+
+    await user.click(draftTab);
+
+    await waitFor(() => {
+      expect(screen.getByRole("tab", { name: "Draft" })).toHaveAttribute("aria-selected", "true");
+      expect(screen.getByRole("tab", { name: "All" })).toHaveAttribute("aria-selected", "false");
+    });
   });
 
   it("form inputs have associated labels", async () => {

@@ -17,6 +17,20 @@ import {
   DialogClose,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import { fetchDashboard, fetchScoreHistory, type ScoreDataPoint } from "@/lib/api/dashboard";
+import { handleUnauthorized } from "@/lib/api/unauthorized";
+import { useAuthStore } from "@/stores/auth-store";
+import {
+  CartesianGrid,
+  Line,
+  LineChart,
+  Bar,
+  BarChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import {
   Target,
   CheckCircle2,
@@ -73,31 +87,54 @@ async function fetchSessions(
   page: number,
   pageSize: number,
   agentId?: string,
-  status?: string
+  status?: string,
+  search?: string,
+  startDate?: string,
+  endDate?: string,
+  token?: string
 ): Promise<PaginatedSessions> {
   const params = new URLSearchParams({ page: String(page), page_size: String(pageSize) });
   if (agentId) params.set("agent_id", agentId);
   if (status) params.set("status", status);
-  const res = await fetch(`${API_BASE_URL}/api/dashboard/sessions?${params}`);
+  if (search?.trim()) params.set("search", search.trim());
+  if (startDate) params.set("start_date", startDate);
+  if (endDate) params.set("end_date", endDate);
+  const res = await fetch(`${API_BASE_URL}/api/dashboard/sessions?${params}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  handleUnauthorized(res);
   if (!res.ok) throw new Error("Failed to fetch sessions");
   return res.json();
 }
 
 async function fetchAllSessionsForExport(
   agentId?: string,
-  status?: string
+  status?: string,
+  search?: string,
+  startDate?: string,
+  endDate?: string,
+  token?: string
 ): Promise<SessionItem[]> {
   const params = new URLSearchParams({ page: "1", page_size: "1000" });
   if (agentId) params.set("agent_id", agentId);
   if (status) params.set("status", status);
-  const res = await fetch(`${API_BASE_URL}/api/dashboard/sessions?${params}`);
+  if (search?.trim()) params.set("search", search.trim());
+  if (startDate) params.set("start_date", startDate);
+  if (endDate) params.set("end_date", endDate);
+  const res = await fetch(`${API_BASE_URL}/api/dashboard/sessions?${params}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  handleUnauthorized(res);
   if (!res.ok) throw new Error("Failed to fetch");
   const data = await res.json();
   return data.items;
 }
 
-async function fetchAgents(): Promise<AgentOption[]> {
-  const res = await fetch(`${API_BASE_URL}/api/dashboard/agents`);
+async function fetchAgents(token?: string): Promise<AgentOption[]> {
+  const res = await fetch(`${API_BASE_URL}/api/dashboard/agents`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  handleUnauthorized(res);
   if (!res.ok) return [];
   return res.json();
 }
@@ -141,12 +178,16 @@ function downloadCsv(data: SessionItem[], fields: ExportFieldKey[]) {
 }
 
 export default function AdminAgentsPage() {
+  const token = useAuthStore((state) => state.token);
   const [page, setPage] = useState(1);
   const pageSize = 15;
 
   // Filters
   const [filterAgent, setFilterAgent] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
+  const [filterSearch, setFilterSearch] = useState("");
+  const [filterStartDate, setFilterStartDate] = useState("");
+  const [filterEndDate, setFilterEndDate] = useState("");
 
   // Export dialog
   const [showExport, setShowExport] = useState(false);
@@ -157,12 +198,22 @@ export default function AdminAgentsPage() {
 
   const { data: agents } = useQuery({
     queryKey: ["agents-list"],
-    queryFn: fetchAgents,
+    queryFn: () => fetchAgents(token ?? undefined),
   });
 
   const { data, isLoading, isError } = useQuery({
-    queryKey: ["admin-sessions", page, pageSize, filterAgent, filterStatus],
-    queryFn: () => fetchSessions(page, pageSize, filterAgent || undefined, filterStatus || undefined),
+    queryKey: ["admin-sessions", page, pageSize, filterAgent, filterStatus, filterSearch, filterStartDate, filterEndDate],
+    queryFn: () => fetchSessions(page, pageSize, filterAgent || undefined, filterStatus || undefined, filterSearch, filterStartDate || undefined, filterEndDate || undefined, token ?? undefined),
+  });
+
+  const { data: scoreHistory = [], isLoading: isScoreHistoryLoading } = useQuery<ScoreDataPoint[]>({
+    queryKey: ["admin-score-history", filterAgent],
+    queryFn: () => fetchScoreHistory(filterAgent || undefined, token ?? undefined),
+  });
+
+  const { data: dashboard } = useQuery({
+    queryKey: ["admin-dashboard"],
+    queryFn: () => fetchDashboard(undefined, token ?? undefined),
   });
 
   const sessions = data?.items ?? [];
@@ -173,12 +224,21 @@ export default function AdminAgentsPage() {
       ? scoredSessions.reduce((acc, s) => acc + (s.overall_score ?? 0), 0) / scoredSessions.length
       : null;
 
+  const comparisonData = (dashboard?.leaderboard ?? []).map((ranking) => ({
+    name: ranking.agent_name,
+    score: ranking.average_score,
+  }));
+
   const handleExport = useCallback(async () => {
     setIsExporting(true);
     try {
       const allData = await fetchAllSessionsForExport(
         filterAgent || undefined,
-        filterStatus || undefined
+        filterStatus || undefined,
+        filterSearch,
+        filterStartDate || undefined,
+        filterEndDate || undefined,
+        token ?? undefined
       );
       downloadCsv(allData, Array.from(exportFields));
     } catch {
@@ -187,7 +247,7 @@ export default function AdminAgentsPage() {
       setIsExporting(false);
       setShowExport(false);
     }
-  }, [filterAgent, filterStatus, exportFields]);
+  }, [filterAgent, filterStatus, filterSearch, filterStartDate, filterEndDate, exportFields, token]);
 
   const toggleExportField = (key: ExportFieldKey) => {
     setExportFields((prev) => {
@@ -258,11 +318,23 @@ export default function AdminAgentsPage() {
             ]}
           />
         </div>
-        {(filterAgent || filterStatus) && (
+        <input aria-label="Search sessions" placeholder="Search sessions..." value={filterSearch} onChange={(e) => { setFilterSearch(e.target.value); setPage(1); }} className="rounded-lg border border-border bg-card px-3 py-2 text-sm" />
+        <div className="flex items-center gap-2">
+          <label htmlFor="session-start-date" className="text-xs font-medium text-muted-foreground">Start date:</label>
+          <input id="session-start-date" aria-label="Filter sessions from date" type="date" value={filterStartDate} onChange={(e) => { setFilterStartDate(e.target.value); setPage(1); }} className="rounded-lg border border-border bg-card px-3 py-2 text-sm" />
+        </div>
+        <div className="flex items-center gap-2">
+          <label htmlFor="session-end-date" className="text-xs font-medium text-muted-foreground">End date:</label>
+          <input id="session-end-date" aria-label="Filter sessions through date" type="date" value={filterEndDate} onChange={(e) => { setFilterEndDate(e.target.value); setPage(1); }} className="rounded-lg border border-border bg-card px-3 py-2 text-sm" />
+        </div>
+        {(filterAgent || filterStatus || filterSearch || filterStartDate || filterEndDate) && (
           <button
             onClick={() => {
               setFilterAgent("");
               setFilterStatus("");
+              setFilterSearch("");
+              setFilterStartDate("");
+              setFilterEndDate("");
               setPage(1);
             }}
             className="text-xs font-medium text-primary hover:underline"
@@ -311,6 +383,58 @@ export default function AdminAgentsPage() {
                 {avgScore ? `${avgScore.toFixed(1)}%` : "—"}
               </p>
             </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <h2 className="text-lg font-medium leading-tight text-foreground">Overall score progression</h2>
+            <p className="text-xs text-muted-foreground">Scored evaluations only; status filters apply to sessions below.</p>
+          </CardHeader>
+          <CardContent>
+            {isScoreHistoryLoading ? (
+              <div className="h-64 animate-pulse rounded-lg bg-muted" aria-label="Loading score progression" />
+            ) : scoreHistory.length === 0 ? (
+              <p className="flex h-64 items-center justify-center text-sm text-muted-foreground">No scored evaluations yet.</p>
+            ) : (
+              <div className="h-64" role="img" aria-label="Overall score progression chart">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={scoreHistory} margin={{ top: 8, right: 12, left: -16, bottom: 8 }}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                    <XAxis dataKey="session_number" tick={{ fontSize: 12 }} />
+                    <YAxis domain={[0, 100]} tick={{ fontSize: 12 }} />
+                    <Tooltip formatter={(value) => [`${value}%`, "Overall score"]} labelFormatter={(label) => `Session ${label}`} />
+                    <Line type="monotone" dataKey="overall_score" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ r: 3 }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <h2 className="text-lg font-medium leading-tight text-foreground">Agent comparison</h2>
+            <p className="text-xs text-muted-foreground">Average score from the existing leaderboard.</p>
+          </CardHeader>
+          <CardContent>
+            {comparisonData.length === 0 ? (
+              <p className="flex h-64 items-center justify-center text-sm text-muted-foreground">No agent comparison data yet.</p>
+            ) : (
+              <div className="h-64" role="img" aria-label="Agent comparison chart">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={comparisonData} margin={{ top: 8, right: 12, left: -16, bottom: 8 }}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                    <XAxis dataKey="name" tick={{ fontSize: 11 }} interval={0} angle={-20} textAnchor="end" height={50} />
+                    <YAxis domain={[0, 100]} tick={{ fontSize: 12 }} />
+                    <Tooltip formatter={(value) => [`${value}%`, "Average score"]} />
+                    <Bar dataKey="score" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -479,7 +603,7 @@ export default function AdminAgentsPage() {
             <DialogTitle>Export session data</DialogTitle>
             <DialogDescription>
               Choose which fields to include in the CSV export.
-              {filterAgent || filterStatus
+              {filterAgent || filterStatus || filterSearch || filterStartDate || filterEndDate
                 ? " Current filters will be applied."
                 : " All sessions will be exported."}
             </DialogDescription>

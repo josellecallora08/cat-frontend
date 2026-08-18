@@ -14,8 +14,8 @@ export function RubricScoreCard({ category, transcript = [] }: RubricScoreCardPr
   const scoreLabel = score === null ? "Not applicable" : `${score}/100`;
 
   return (
-    <article className="min-w-0 space-y-4 rounded-xl border border-border bg-card p-4 [overflow-wrap:anywhere]" aria-labelledby={`rubric-${category.rubric_block_id}`}>
-      <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
+    <article className="min-w-0 space-y-4 border-b border-border pb-6 last:border-b-0" aria-labelledby={`rubric-${category.rubric_block_id}`}>
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h3 id={`rubric-${category.rubric_block_id}`} className="text-base font-semibold text-foreground">{category.category}</h3>
           <p className="mt-1 text-xs text-muted-foreground">Block weight {category.weight}% · passing score {category.passing_score}%</p>
@@ -27,7 +27,15 @@ export function RubricScoreCard({ category, transcript = [] }: RubricScoreCardPr
       </div>
 
       <div className="grid gap-3 text-sm sm:grid-cols-2">
-        <div className="rounded-lg bg-muted/40 p-3"><p className="text-xs text-muted-foreground">Raw score</p><p className="mt-1 font-semibold text-foreground">{category.raw_score === null ? "Not applicable" : `${category.raw_score}/100`}</p></div>
+      <div
+        role="img"
+        aria-label={`${category.category} score visualization: ${scoreLabel}`}
+        className="rounded-lg bg-muted/40 p-3"
+      >
+        <p className="text-xs text-muted-foreground">Raw score</p>
+        <p className="mt-1 font-semibold text-foreground">{category.raw_score === null ? "Not applicable" : `${category.raw_score}/100`}</p>
+        <p className="sr-only">Final category score: {scoreLabel}. Passing status: {category.passed ? "passing" : "needs practice"}.</p>
+      </div>
         <div className="rounded-lg bg-muted/40 p-3"><p className="text-xs text-muted-foreground">Penalty applied</p><p className="mt-1 font-semibold text-foreground">-{category.penalty_total} points</p></div>
       </div>
 
