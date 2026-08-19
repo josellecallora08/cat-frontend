@@ -14,7 +14,12 @@ interface RubricBlockEditorProps {
   onMove: (direction: "up" | "down") => void;
 }
 
-function Field({ id, label, value, onChange, type = "text", disabled = false, error, hint }: {
+/** Marks a field label as required, matching the pattern used elsewhere in the app. */
+function RequiredMark() {
+  return <span className="text-destructive" aria-hidden="true"> *</span>;
+}
+
+function Field({ id, label, value, onChange, type = "text", disabled = false, error, hint, required = false }: {
   id: string;
   label: string;
   value: string | number;
@@ -23,12 +28,13 @@ function Field({ id, label, value, onChange, type = "text", disabled = false, er
   disabled?: boolean;
   error?: string;
   hint?: string;
+  required?: boolean;
 }) {
   const errorId = `${id}-error`;
   const hintId = `${id}-hint`;
   return (
     <div className="min-w-0">
-      <label htmlFor={id} className="text-xs font-semibold text-foreground">{label}</label>
+      <label htmlFor={id} className="text-xs font-semibold text-foreground">{label}{required && <RequiredMark />}</label>
       <input
         id={id}
         aria-invalid={Boolean(error)}
@@ -82,15 +88,15 @@ function CriterionEditor({ criterion, kind, readOnly, errors, onChange, onRemove
         {!readOnly && <Button type="button" variant="ghost" size="icon" onClick={onRemove} className="min-h-11 min-w-11 shrink-0 text-muted-foreground hover:bg-destructive/10 hover:text-destructive" aria-label={`Remove ${kind}`}><Trash2 className="h-4 w-4" aria-hidden="true" /></Button>}
       </div>
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
-        <Field id={`${criterion.id}-id`} label="Stable ID" value={criterion.id} disabled={readOnly} onChange={(value) => update("id", value)} error={errors.id} />
-        <Field id={`${criterion.id}-name`} label="Name" value={criterion.name} disabled={readOnly} onChange={(value) => update("name", value)} error={errors.name} />
+        <Field id={`${criterion.id}-id`} label="Stable ID" value={criterion.id} disabled={readOnly} onChange={(value) => update("id", value)} error={errors.id} required />
+        <Field id={`${criterion.id}-name`} label="Name" value={criterion.name} disabled={readOnly} onChange={(value) => update("name", value)} error={errors.name} required />
       </div>
       <div className="mt-4 grid gap-4 lg:grid-cols-2">
-        <label htmlFor={`${criterion.id}-description`} className="block text-xs font-semibold text-foreground">Description
+        <label htmlFor={`${criterion.id}-description`} className="block text-xs font-semibold text-foreground">Description<RequiredMark />
           <textarea id={`${criterion.id}-description`} aria-invalid={Boolean(errors.description)} aria-describedby={errors.description ? descriptionErrorId : undefined} value={criterion.description} disabled={readOnly} onChange={(event) => update("description", event.target.value)} rows={3} className={`mt-1.5 min-h-11 w-full resize-y rounded-lg border bg-background px-3 py-2 text-sm font-normal text-foreground shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/20 disabled:cursor-not-allowed disabled:bg-muted/50 disabled:opacity-60 ${errors.description ? "border-destructive/70 focus-visible:border-destructive focus-visible:ring-destructive/20" : "border-input"}`} />
           {errors.description && <p id={descriptionErrorId} className="mt-1 text-xs text-destructive">{errors.description}</p>}
         </label>
-        <label htmlFor={`${criterion.id}-evidence`} className="block text-xs font-semibold text-foreground">Evidence instructions
+        <label htmlFor={`${criterion.id}-evidence`} className="block text-xs font-semibold text-foreground">Evidence instructions<RequiredMark />
           <textarea id={`${criterion.id}-evidence`} aria-invalid={Boolean(errors.evidence_instructions)} aria-describedby={errors.evidence_instructions ? evidenceErrorId : undefined} value={criterion.evidence_instructions} disabled={readOnly} onChange={(event) => update("evidence_instructions", event.target.value)} rows={3} className={`mt-1.5 min-h-11 w-full resize-y rounded-lg border bg-background px-3 py-2 text-sm font-normal text-foreground shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/20 disabled:cursor-not-allowed disabled:bg-muted/50 disabled:opacity-60 ${errors.evidence_instructions ? "border-destructive/70 focus-visible:border-destructive focus-visible:ring-destructive/20" : "border-input"}`} />
           {errors.evidence_instructions && <p id={evidenceErrorId} className="mt-1 text-xs text-destructive">{errors.evidence_instructions}</p>}
         </label>
@@ -124,7 +130,6 @@ export function RubricBlockEditor({ block, readOnly = false, errors = {}, onChan
       <header className="border-b border-border/70 bg-linear-to-br from-primary/10 via-card to-card px-5 py-5 sm:px-7 sm:py-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex min-w-0 items-start gap-3">
-            <div className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary text-sm font-bold text-primary-foreground shadow-sm" aria-hidden="true">{String(block.display_order + 1).padStart(2, "0")}</div>
             <div className="min-w-0">
               <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">Rubric block</p>
               <h3 id={`block-${block.id}`} className="mt-1 truncate text-xl font-semibold tracking-tight text-foreground">{block.category || "Untitled rubric block"}</h3>
@@ -138,7 +143,7 @@ export function RubricBlockEditor({ block, readOnly = false, errors = {}, onChan
             <Button type="button" variant="ghost" size="icon" onClick={onRemove} className="min-h-11 min-w-11 text-muted-foreground hover:bg-destructive/10 hover:text-destructive" aria-label={`Remove ${block.category}`}><Trash2 className="h-4 w-4" aria-hidden="true" /></Button>
           </div>}
         </div>
-        <div className="mt-5 flex flex-wrap gap-2 pl-[3.25rem]">
+        <div className="mt-5 flex flex-wrap gap-2">
           <span className="rounded-full border border-primary/20 bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">{block.weight}% weight</span>
           <span className="rounded-full border border-border bg-background/80 px-2.5 py-1 text-xs font-medium text-muted-foreground">Passing score {block.passing_score}%</span>
         </div>
@@ -148,13 +153,19 @@ export function RubricBlockEditor({ block, readOnly = false, errors = {}, onChan
         <section className="rounded-xl border border-border/70 bg-muted/20 p-4 sm:p-5" aria-labelledby={`details-${block.id}`}>
           <SectionHeading title="Block details" description="Set the category, weight, and passing threshold for this block." />
           <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <Field id={`${block.id}-id`} label="Stable ID" value={block.id} disabled={readOnly} onChange={(value) => update("id", value)} error={errors.id} />
-            <Field id={`${block.id}-category`} label="Category" value={block.category} disabled={readOnly} onChange={(value) => update("category", value)} error={errors.category} />
-            <Field id={`${block.id}-weight`} label="Weight (%)" type="number" value={block.weight} disabled={readOnly} onChange={(value) => update("weight", Number(value))} error={errors.weight} />
-            <Field id={`${block.id}-passing-score`} label="Passing score" hint="%" type="number" value={block.passing_score} disabled={readOnly} onChange={(value) => update("passing_score", Number(value))} error={errors.passing_score} />
+            <Field id={`${block.id}-id`} label="Stable ID" value={block.id} disabled={readOnly} onChange={(value) => update("id", value)} error={errors.id} required />
+            <Field id={`${block.id}-category`} label="Category" value={block.category} disabled={readOnly} onChange={(value) => update("category", value)} error={errors.category} required />
+            <div>
+              <Field id={`${block.id}-weight`} label="Weight (%)" type="number" value={block.weight} disabled={readOnly} onChange={(value) => update("weight", Number(value))} error={errors.weight} required />
+              <p className="mt-1 text-xs text-muted-foreground">Share of the total score this category is worth. All blocks must add up to 100%.</p>
+            </div>
+            <div>
+              <Field id={`${block.id}-passing-score`} label="Passing score" hint="%" type="number" value={block.passing_score} disabled={readOnly} onChange={(value) => update("passing_score", Number(value))} error={errors.passing_score} required />
+              <p className="mt-1 text-xs text-muted-foreground">Minimum score a trainee needs in just this category.</p>
+            </div>
           </div>
-          <label htmlFor={`${block.id}-scoring-instructions`} className="mt-4 block text-xs font-semibold text-foreground">Scoring instructions
-            <textarea id={`${block.id}-scoring-instructions`} aria-invalid={Boolean(errors.scoring_instructions)} aria-describedby={errors.scoring_instructions ? `${block.id}-scoring-instructions-error` : undefined} value={block.scoring_instructions} disabled={readOnly} onChange={(event) => update("scoring_instructions", event.target.value)} rows={3} className={`mt-1.5 min-h-11 w-full resize-y rounded-lg border bg-background px-3 py-2 text-sm font-normal text-foreground shadow-xs outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/20 disabled:cursor-not-allowed disabled:bg-muted/50 disabled:opacity-60 ${errors.scoring_instructions ? "border-destructive/70 focus-visible:border-destructive focus-visible:ring-destructive/20" : "border-input"}`} placeholder="Explain how this block should be scored." />
+          <label htmlFor={`${block.id}-scoring-instructions`} className="mt-4 block text-xs font-semibold text-foreground">Scoring instructions<RequiredMark />
+            <textarea id={`${block.id}-scoring-instructions`} aria-invalid={Boolean(errors.scoring_instructions)} aria-describedby={errors.scoring_instructions ? `${block.id}-scoring-instructions-error` : undefined} value={block.scoring_instructions} disabled={readOnly} onChange={(event) => update("scoring_instructions", event.target.value)} rows={8} className={`mt-1.5 min-h-11 w-full resize-y rounded-lg border bg-background px-3 py-2 text-sm font-normal text-foreground shadow-xs outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/20 disabled:cursor-not-allowed disabled:bg-muted/50 disabled:opacity-60 ${errors.scoring_instructions ? "border-destructive/70 focus-visible:border-destructive focus-visible:ring-destructive/20" : "border-input"}`} placeholder="Explain how this block should be scored." />
             {errors.scoring_instructions && <p id={`${block.id}-scoring-instructions-error`} className="mt-1 text-xs text-destructive">{errors.scoring_instructions}</p>}
           </label>
         </section>
@@ -185,7 +196,7 @@ export function RubricBlockEditor({ block, readOnly = false, errors = {}, onChan
               </div>
             </div>)}
           </div>
-          {block.penalties.length === 0 && <p className="mt-4 rounded-lg border border-dashed border-border bg-background/60 px-4 py-3 text-sm text-muted-foreground">No penalties configured.</p>}
+          {block.penalties.length === 0 && <p className="mt-4 rounded-lg border border-dashed border-background/60 px-4 py-3 text-sm text-muted-foreground">No penalties configured.</p>}
         </section>
 
         <section className="rounded-xl border border-border/70 bg-muted/20 p-4 sm:p-5" aria-labelledby={`guidance-${block.id}`}>

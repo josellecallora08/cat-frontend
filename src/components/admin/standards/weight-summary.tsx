@@ -1,4 +1,7 @@
-import { CheckCircle2, CircleAlert } from "lucide-react";
+"use client";
+
+import { CheckCircle2, ChevronDown, ChevronUp, CircleAlert } from "lucide-react";
+import { useId, useState } from "react";
 
 interface WeightSummaryProps {
   total: number;
@@ -6,6 +9,8 @@ interface WeightSummaryProps {
 }
 
 export function WeightSummary({ total, errorCount = 0 }: WeightSummaryProps) {
+  const [whyExpanded, setWhyExpanded] = useState(false);
+  const whyRegionId = `weight-summary-why-${useId().replaceAll(":", "")}`;
   const difference = 100 - total;
   const valid = total === 100 && errorCount === 0;
   const message = valid
@@ -39,6 +44,25 @@ export function WeightSummary({ total, errorCount = 0 }: WeightSummaryProps) {
         </p>
       </div>
       {errorCount > 0 && <p className="mt-2 text-xs text-destructive">{errorCount} validation error{errorCount === 1 ? "" : "s"}.</p>}
+      <div className="mt-3">
+        <button
+          type="button"
+          aria-expanded={whyExpanded}
+          aria-controls={whyRegionId}
+          onClick={() => setWhyExpanded((current) => !current)}
+          className="inline-flex min-h-11 items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        >
+          Why 100%?
+          {whyExpanded ? <ChevronUp className="h-3.5 w-3.5" aria-hidden="true" /> : <ChevronDown className="h-3.5 w-3.5" aria-hidden="true" />}
+        </button>
+        <div id={whyRegionId}>
+          {whyExpanded && (
+            <p className="mt-1 text-xs text-muted-foreground">
+              Every trainee&apos;s score is a blend of each category&apos;s weight. If the weights don&apos;t add up to 100%, the math can&apos;t produce a fair final score.
+            </p>
+          )}
+        </div>
+      </div>
     </section>
   );
 }
