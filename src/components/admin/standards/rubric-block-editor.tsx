@@ -1,6 +1,7 @@
 "use client";
 
 import { ChevronDown, ChevronUp, Plus, Trash2 } from "lucide-react";
+import { useId, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import type { RubricBlock, RubricCriterion, RubricPenalty } from "@/lib/negotiation-standard-types";
@@ -51,6 +52,33 @@ function Field({ id, label, value, onChange, type = "text", disabled = false, er
   );
 }
 
+/** Read-only Stable ID, tucked behind a toggle so it doesn't compete with editable fields. */
+function StableIdDisclosure({ id }: { id: string }) {
+  const [open, setOpen] = useState(false);
+  const regionId = `stable-id-${useId().replaceAll(":", "")}`;
+  return (
+    <div className="mt-3">
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-controls={regionId}
+        onClick={() => setOpen((current) => !current)}
+        className="inline-flex min-h-11 items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+      >
+        {open ? "Hide" : "Show"} stable ID
+        {open ? <ChevronUp className="h-3.5 w-3.5" aria-hidden="true" /> : <ChevronDown className="h-3.5 w-3.5" aria-hidden="true" />}
+      </button>
+      <div id={regionId}>
+        {open && (
+          <p className="mt-1.5 rounded-lg border border-card-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+            Stable ID: <span className="font-mono text-foreground">{id}</span> · auto-generated, not editable.
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function SectionHeading({ title, description, count }: { title: string; description: string; count?: number }) {
   return (
     <div className="flex flex-wrap items-start justify-between gap-3">
@@ -76,7 +104,7 @@ function CriterionEditor({ criterion, kind, readOnly, errors, onChange, onRemove
   const descriptionErrorId = `${criterion.id}-description-error`;
   const evidenceErrorId = `${criterion.id}-evidence-error`;
   return (
-    <div className="rounded-xl border border-border/70 bg-background p-4 shadow-xs sm:p-5">
+    <div className="rounded-xl border border-card-border bg-background p-4 shadow-xs sm:p-5">
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-start gap-2.5">
           <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${kind === "behavior" ? "bg-success" : "bg-destructive"}`} aria-hidden="true" />
@@ -87,8 +115,7 @@ function CriterionEditor({ criterion, kind, readOnly, errors, onChange, onRemove
         </div>
         {!readOnly && <Button type="button" variant="ghost" size="icon" onClick={onRemove} className="min-h-11 min-w-11 shrink-0 text-muted-foreground hover:bg-destructive/10 hover:text-destructive" aria-label={`Remove ${kind}`}><Trash2 className="h-4 w-4" aria-hidden="true" /></Button>}
       </div>
-      <div className="mt-4 grid gap-3 sm:grid-cols-2">
-        <Field id={`${criterion.id}-id`} label="Stable ID" value={criterion.id} disabled={readOnly} onChange={(value) => update("id", value)} error={errors.id} required />
+      <div className="mt-4">
         <Field id={`${criterion.id}-name`} label="Name" value={criterion.name} disabled={readOnly} onChange={(value) => update("name", value)} error={errors.name} required />
       </div>
       <div className="mt-4 grid gap-4 lg:grid-cols-2">
@@ -101,6 +128,7 @@ function CriterionEditor({ criterion, kind, readOnly, errors, onChange, onRemove
           {errors.evidence_instructions && <p id={evidenceErrorId} className="mt-1 text-xs text-destructive">{errors.evidence_instructions}</p>}
         </label>
       </div>
+      <StableIdDisclosure id={criterion.id} />
     </div>
   );
 }
@@ -126,17 +154,16 @@ export function RubricBlockEditor({ block, readOnly = false, errors = {}, onChan
   };
 
   return (
-    <article className="overflow-hidden rounded-2xl border border-border/70 bg-card shadow-sm" aria-labelledby={`block-${block.id}`}>
-      <header className="border-b border-border/70 bg-linear-to-br from-primary/10 via-card to-card px-5 py-5 sm:px-7 sm:py-6">
+    <article className="overflow-hidden rounded-2xl border border-card-border bg-card shadow-sm" aria-labelledby={`block-${block.id}`}>
+      <header className="border-b border-card-border bg-linear-to-br from-primary/10 via-card to-card px-5 py-5 sm:px-7 sm:py-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex min-w-0 items-start gap-3">
             <div className="min-w-0">
               <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">Rubric block</p>
               <h3 id={`block-${block.id}`} className="mt-1 truncate text-xl font-semibold tracking-tight text-foreground">{block.category || "Untitled rubric block"}</h3>
-              <p className="mt-1 truncate text-xs text-muted-foreground">ID: {block.id}</p>
             </div>
           </div>
-          {!readOnly && <div className="flex items-center gap-1 rounded-xl border border-border/70 bg-background/80 p-1 shadow-xs">
+          {!readOnly && <div className="flex items-center gap-1 rounded-xl border border-card-border bg-background/80 p-1 shadow-xs">
             <Button type="button" variant="ghost" size="icon" onClick={() => onMove("up")} className="min-h-11 min-w-11 text-muted-foreground" aria-label={`Move ${block.category} up`}><ChevronUp className="h-4 w-4" aria-hidden="true" /></Button>
             <Button type="button" variant="ghost" size="icon" onClick={() => onMove("down")} className="min-h-11 min-w-11 text-muted-foreground" aria-label={`Move ${block.category} down`}><ChevronDown className="h-4 w-4" aria-hidden="true" /></Button>
             <span className="mx-1 h-6 w-px bg-border" aria-hidden="true" />
@@ -150,10 +177,9 @@ export function RubricBlockEditor({ block, readOnly = false, errors = {}, onChan
       </header>
 
       <div className="space-y-6 px-5 py-5 sm:px-7 sm:py-7">
-        <section className="rounded-xl border border-border/70 bg-muted/20 p-4 sm:p-5" aria-labelledby={`details-${block.id}`}>
+        <section className="rounded-xl border border-card-border bg-muted/20 p-4 sm:p-5" aria-labelledby={`details-${block.id}`}>
           <SectionHeading title="Block details" description="Set the category, weight, and passing threshold for this block." />
-          <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <Field id={`${block.id}-id`} label="Stable ID" value={block.id} disabled={readOnly} onChange={(value) => update("id", value)} error={errors.id} required />
+          <div className="mt-4 grid gap-4 sm:grid-cols-3">
             <Field id={`${block.id}-category`} label="Category" value={block.category} disabled={readOnly} onChange={(value) => update("category", value)} error={errors.category} required />
             <div>
               <Field id={`${block.id}-weight`} label="Weight (%)" type="number" value={block.weight} disabled={readOnly} onChange={(value) => update("weight", Number(value))} error={errors.weight} required />
@@ -168,24 +194,25 @@ export function RubricBlockEditor({ block, readOnly = false, errors = {}, onChan
             <textarea id={`${block.id}-scoring-instructions`} aria-invalid={Boolean(errors.scoring_instructions)} aria-describedby={errors.scoring_instructions ? `${block.id}-scoring-instructions-error` : undefined} value={block.scoring_instructions} disabled={readOnly} onChange={(event) => update("scoring_instructions", event.target.value)} rows={8} className={`mt-1.5 min-h-11 w-full resize-y rounded-lg border bg-background px-3 py-2 text-sm font-normal text-foreground shadow-xs outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/20 disabled:cursor-not-allowed disabled:bg-muted/50 disabled:opacity-60 ${errors.scoring_instructions ? "border-destructive/70 focus-visible:border-destructive focus-visible:ring-destructive/20" : "border-input"}`} placeholder="Explain how this block should be scored." />
             {errors.scoring_instructions && <p id={`${block.id}-scoring-instructions-error`} className="mt-1 text-xs text-destructive">{errors.scoring_instructions}</p>}
           </label>
+          <StableIdDisclosure id={block.id} />
         </section>
 
-        <section className="rounded-xl border border-border/70 bg-card p-4 sm:p-5" aria-labelledby={`behaviors-${block.id}`}>
-          <div className="flex flex-wrap items-start justify-between gap-3"><div><h4 id={`behaviors-${block.id}`} className="text-sm font-semibold text-foreground">Positive behaviors</h4><p className="mt-1 text-xs leading-5 text-muted-foreground">Behaviors the evaluator should reward.</p></div><div className="flex items-center gap-2"><span className="rounded-full bg-success-muted px-2.5 py-1 text-xs font-medium text-success">{block.positive_behaviors.length}</span>{!readOnly && <Button type="button" variant="outline" className="min-h-11" onClick={() => update("positive_behaviors", [...block.positive_behaviors, defaultCriterion("behavior", "New behavior")])}><Plus className="h-4 w-4" aria-hidden="true" />Add behavior</Button>}</div></div>
+        <section className="rounded-xl border border-card-border bg-card p-4 sm:p-5" aria-labelledby={`behaviors-${block.id}`}>
+          <div className="flex flex-wrap items-start justify-between gap-3"><div><h4 id={`behaviors-${block.id}`} className="text-sm font-semibold text-foreground">Positive behaviors</h4><p className="mt-1 text-xs leading-5 text-muted-foreground">Behaviors the evaluator should reward.</p></div>{!readOnly && <Button type="button" variant="outline" className="min-h-11" onClick={() => update("positive_behaviors", [...block.positive_behaviors, defaultCriterion("behavior", "New behavior")])}><Plus className="h-4 w-4" aria-hidden="true" />Add behavior</Button>}</div>
           <div className="mt-4 space-y-3">{block.positive_behaviors.map((criterion, index) => <CriterionEditor key={criterion.id} criterion={criterion} kind="behavior" readOnly={readOnly} errors={criterionErrors("positive_behaviors", index)} onChange={(value) => updateBehavior(criterion.id, value)} onRemove={() => update("positive_behaviors", block.positive_behaviors.filter((item) => item.id !== criterion.id))} />)}</div>
           {block.positive_behaviors.length === 0 && <p className="mt-4 rounded-lg border border-dashed border-border bg-muted/20 px-4 py-3 text-sm text-muted-foreground">No positive behaviors added yet.</p>}
         </section>
 
-        <section className="rounded-xl border border-border/70 bg-card p-4 sm:p-5" aria-labelledby={`violations-${block.id}`}>
-          <div className="flex flex-wrap items-start justify-between gap-3"><div><h4 id={`violations-${block.id}`} className="text-sm font-semibold text-foreground">Violations</h4><p className="mt-1 text-xs leading-5 text-muted-foreground">Behaviors that should trigger a finding or deduction.</p></div><div className="flex items-center gap-2"><span className="rounded-full bg-destructive/10 px-2.5 py-1 text-xs font-medium text-destructive">{block.violations.length}</span>{!readOnly && <Button type="button" variant="outline" className="min-h-11" onClick={() => update("violations", [...block.violations, defaultCriterion("violation", "New violation")])}><Plus className="h-4 w-4" aria-hidden="true" />Add violation</Button>}</div></div>
+        <section className="rounded-xl border border-card-border bg-card p-4 sm:p-5" aria-labelledby={`violations-${block.id}`}>
+          <div className="flex flex-wrap items-start justify-between gap-3"><div><h4 id={`violations-${block.id}`} className="text-sm font-semibold text-foreground">Violations</h4><p className="mt-1 text-xs leading-5 text-muted-foreground">Behaviors that should trigger a finding or deduction.</p></div>{!readOnly && <Button type="button" variant="outline" className="min-h-11" onClick={() => update("violations", [...block.violations, defaultCriterion("violation", "New violation")])}><Plus className="h-4 w-4" aria-hidden="true" />Add violation</Button>}</div>
           <div className="mt-4 space-y-3">{block.violations.map((criterion, index) => <CriterionEditor key={criterion.id} criterion={criterion} kind="violation" readOnly={readOnly} errors={criterionErrors("violations", index)} onChange={(value) => updateViolation(criterion.id, value)} onRemove={() => removeViolation(criterion.id)} />)}</div>
           {block.violations.length === 0 && <p className="mt-4 rounded-lg border border-dashed border-border bg-muted/20 px-4 py-3 text-sm text-muted-foreground">No violations added yet.</p>}
         </section>
 
-        <section className="rounded-xl border border-border/70 bg-muted/20 p-4 sm:p-5" aria-labelledby={`penalties-${block.id}`}>
-          <div className="flex flex-wrap items-start justify-between gap-3"><div><h4 id={`penalties-${block.id}`} className="text-sm font-semibold text-foreground">Penalties</h4><p className="mt-1 text-xs leading-5 text-muted-foreground">Optional deductions linked to a violation.</p></div><div className="flex items-center gap-2"><span className="rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">{block.penalties.length}</span>{!readOnly && <Button type="button" variant="outline" className="min-h-11" onClick={() => { if (availableViolation) update("penalties", [...block.penalties, { violation_id: availableViolation.id, deduction: 0, max_occurrences: 1 }]); }} disabled={!availableViolation}><Plus className="h-4 w-4" aria-hidden="true" />Add penalty</Button>}</div></div>
+        <section className="rounded-xl border border-card-border bg-muted/20 p-4 sm:p-5" aria-labelledby={`penalties-${block.id}`}>
+          <div className="flex flex-wrap items-start justify-between gap-3"><div><h4 id={`penalties-${block.id}`} className="text-sm font-semibold text-foreground">Penalties</h4><p className="mt-1 text-xs leading-5 text-muted-foreground">Optional deductions linked to a violation.</p></div>{!readOnly && <Button type="button" variant="outline" className="min-h-11" onClick={() => { if (availableViolation) update("penalties", [...block.penalties, { violation_id: availableViolation.id, deduction: 0, max_occurrences: 1 }]); }} disabled={!availableViolation}><Plus className="h-4 w-4" aria-hidden="true" />Add penalty</Button>}</div>
           <div className="mt-4 space-y-3">
-            {block.penalties.map((penalty) => <div key={`${block.id}-penalty-${penalty.violation_id}`} className="rounded-xl border border-border/70 bg-background p-4 shadow-xs sm:p-5">
+            {block.penalties.map((penalty) => <div key={`${block.id}-penalty-${penalty.violation_id}`} className="rounded-xl border border-card-border bg-background p-4 shadow-xs sm:p-5">
               <div className="flex items-start justify-between gap-3"><div><p className="text-sm font-semibold text-foreground">Penalty rule</p><p className="mt-0.5 text-xs text-muted-foreground">Connect a violation to its deduction.</p></div>{!readOnly && <Button type="button" variant="ghost" size="icon" onClick={() => removePenalty(penalty.violation_id)} className="min-h-11 min-w-11 text-muted-foreground hover:bg-destructive/10 hover:text-destructive" aria-label={`Remove penalty for ${penalty.violation_id}`}><Trash2 className="h-4 w-4" aria-hidden="true" /></Button>}</div>
               <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 <label htmlFor={`${block.id}-penalty-${penalty.violation_id}-violation`} className="text-xs font-semibold text-foreground sm:col-span-2">Violation
@@ -199,7 +226,7 @@ export function RubricBlockEditor({ block, readOnly = false, errors = {}, onChan
           {block.penalties.length === 0 && <p className="mt-4 rounded-lg border border-dashed border-background/60 px-4 py-3 text-sm text-muted-foreground">No penalties configured.</p>}
         </section>
 
-        <section className="rounded-xl border border-border/70 bg-muted/20 p-4 sm:p-5" aria-labelledby={`guidance-${block.id}`}>
+        <section className="rounded-xl border border-card-border bg-muted/20 p-4 sm:p-5" aria-labelledby={`guidance-${block.id}`}>
           <div><h4 id={`guidance-${block.id}`} className="text-sm font-semibold text-foreground">Recommendation guidance</h4><p className="mt-1 text-xs leading-5 text-muted-foreground">Give the coach practical guidance for this block.</p></div>
           <label htmlFor={`${block.id}-recommendation-guidance`} className="sr-only">Recommendation guidance</label>
           <textarea id={`${block.id}-recommendation-guidance`} aria-invalid={Boolean(errors.recommendation_guidance)} aria-describedby={errors.recommendation_guidance ? `${block.id}-recommendation-guidance-error` : undefined} value={block.recommendation_guidance} disabled={readOnly} onChange={(event) => update("recommendation_guidance", event.target.value)} rows={3} className={`mt-4 min-h-11 w-full resize-y rounded-lg border bg-background px-3 py-2 text-sm text-foreground shadow-xs outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/20 disabled:cursor-not-allowed disabled:bg-muted/50 disabled:opacity-60 ${errors.recommendation_guidance ? "border-destructive/70 focus-visible:border-destructive focus-visible:ring-destructive/20" : "border-input"}`} placeholder="Explain what a coach should reinforce or practice next." />

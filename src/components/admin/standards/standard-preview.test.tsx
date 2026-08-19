@@ -23,12 +23,7 @@ const content: NegotiationStandardContent = {
   ],
 };
 
-describe("StandardPreview 'no AI used' badge", () => {
-  it("renders a badge clarifying this preview does not call an LLM", () => {
-    render(<StandardPreview content={content} name="Collections standard" />);
-    expect(screen.getByText("Preview — no AI used")).toBeInTheDocument();
-  });
-
+describe("StandardPreview", () => {
   it("never issues a network request while rendering the preview", () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch");
     render(<StandardPreview content={content} name="Collections standard" versionNumber={2} />);

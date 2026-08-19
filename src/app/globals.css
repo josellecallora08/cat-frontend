@@ -43,6 +43,7 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
+  --color-card-border: var(--card-border);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -82,6 +83,7 @@
   --warning-foreground: #8a5a00;
   --warning-muted: #fdf2dd;
   --border: #edeff0;
+  --card-border: #d7dadd;
   --input: #edeff0;
   --ring: #8e69e0;
   --chart-1: #8e69e0;

@@ -15,7 +15,7 @@ export function VersionHistory({ versions, selectedVersionId, currentVersionId, 
     return <div className="rounded-xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">No published versions yet.</div>;
   }
   return (
-    <section aria-labelledby="version-history-heading" className="rounded-xl border border-border bg-card p-4">
+    <section aria-labelledby="version-history-heading" className="rounded-xl border border-card-border bg-card p-4">
       <h2 id="version-history-heading" className="text-lg font-semibold text-foreground">Version history</h2>
       <div className="mt-3 space-y-2">
         {versions.map((version) => <button key={version.id} type="button" onClick={() => onSelect(version)} aria-pressed={selectedVersionId === version.id} className="flex min-h-11 w-full items-center justify-between rounded-lg border border-border px-3 py-2 text-left hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" >
