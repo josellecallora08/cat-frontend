@@ -3,6 +3,7 @@
 import { Portal } from "@/components/portal";
 import { Button } from "@/components/ui/button";
 import { useSessionStore } from "@/stores/session-store";
+import { cancelSession } from "@/lib/api/sessions";
 import gsap from "gsap";
 import { AlertCircle, Mic, Phone, PhoneOff } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -460,7 +461,7 @@ function NewSessionContent() {
   const debtorName = searchParams.get("debtor_name") ?? undefined;
 
   const { status, error, sessionId, createSession, reset } = useSessionStore();
-  const hasInitiated = useRef(false);
+  const initiatedFor = useRef<string | null>(null);
   const screenRef = useRef<RingingScreenHandle>(null);
 
   // Frame 3 → Frame 4: "Calling…" for ~1.2s, then "Ringing…"
@@ -472,18 +473,12 @@ function NewSessionContent() {
 
   useEffect(() => {
     if (!scenarioId) return;
-    hasInitiated.current = false;
+    const selectionKey = `${scenarioId}:${campaignId ?? ""}`;
+    if (initiatedFor.current === selectionKey) return;
+    initiatedFor.current = selectionKey;
     reset();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scenarioId]);
-
-  useEffect(() => {
-    if (!scenarioId) return;
-    if (status === "idle" && !hasInitiated.current) {
-      hasInitiated.current = true;
-      createSession(scenarioId, campaignId);
-    }
-  }, [scenarioId, campaignId, status, createSession]);
+    createSession(scenarioId, campaignId, crypto.randomUUID());
+  }, [scenarioId, campaignId, createSession, reset]);
 
   // Connecting: wait for min ring time + GSAP exit, then navigate
   useEffect(() => {
@@ -501,9 +496,12 @@ function NewSessionContent() {
 
   const handleCancel = useCallback(async () => {
     if (screenRef.current?.exit) await screenRef.current.exit("cancel");
+    if (sessionId) {
+      await cancelSession(sessionId).catch(() => undefined);
+    }
     reset();
     router.push("/scenarios");
-  }, [reset, router]);
+  }, [sessionId, reset, router]);
 
   if (!scenarioId) {
     return (

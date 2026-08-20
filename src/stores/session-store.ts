@@ -23,7 +23,7 @@ export interface SessionState {
 }
 
 export interface SessionActions {
-  createSession: (scenarioId: string, campaignId?: string) => Promise<void>;
+  createSession: (scenarioId: string, campaignId?: string, creationKey?: string) => Promise<void>;
   endSession: () => Promise<void>;
   setStatus: (status: SessionStoreStatus) => void;
   setError: (error: string | null) => void;
@@ -43,11 +43,11 @@ const initialState: SessionState = {
 export const useSessionStore = create<SessionStore>((set, get) => ({
   ...initialState,
 
-  createSession: async (scenarioId: string, campaignId?: string) => {
+  createSession: async (scenarioId: string, campaignId?: string, creationKey?: string) => {
     set({ status: "creating", scenarioId, error: null });
 
     try {
-      const session = await apiCreateSession(scenarioId, campaignId);
+      const session = await apiCreateSession(scenarioId, campaignId, creationKey);
 
       // Track session in localStorage for history page
       const stored = localStorage.getItem("cat_sessions");
