@@ -207,8 +207,6 @@ function normalizedAggregateReport(report: SessionReport): NormalizedReport {
   const session = {
     id: summary.session_id,
     scenario_id: summary.scenario_id,
-    scenario_name: summary.scenario_id,
-    agent_name: summary.agent_id,
     status: summary.status,
     created_at: summary.created_at,
     ended_at: summary.ended_at,
