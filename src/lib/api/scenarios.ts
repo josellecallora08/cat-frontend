@@ -49,8 +49,18 @@ export async function fetchScenarios(token?: string): Promise<ScenarioListItem[]
   return response.json();
 }
 
-export async function fetchScenarioById(id: string): Promise<ScenarioDetail> {
-  const response = await fetch(`${API_BASE_URL}/api/scenarios/${id}`);
+export async function fetchScenarioById(id: string, token: string): Promise<ScenarioDetail> {
+  const response = await fetch(`${API_BASE_URL}/api/scenarios/${id}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  if (response.status === 401) {
+    throw new Error("Authentication required");
+  }
+
+  if (response.status === 403 || response.status === 404) {
+    throw new Error("This scenario is not available in your assigned campaigns.");
+  }
 
   if (response.status === 422) {
     throw new ScenarioIncompleteProfileError(

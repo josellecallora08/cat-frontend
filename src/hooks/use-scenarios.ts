@@ -5,17 +5,22 @@ import { useAuthStore } from "@/stores/auth-store";
 
 export function useScenarios() {
   const token = useAuthStore((s) => s.token);
+  const isHydrated = useAuthStore((s) => s.isHydrated);
 
   return useQuery({
-    queryKey: ["scenarios", token ? "authenticated" : "public"],
+    queryKey: ["scenarios", token],
     queryFn: () => fetchScenarios(token ?? undefined),
+    enabled: isHydrated && !!token,
   });
 }
 
 export function useScenario(id: string) {
+  const token = useAuthStore((s) => s.token);
+  const isHydrated = useAuthStore((s) => s.isHydrated);
+
   return useQuery({
-    queryKey: ["scenarios", id],
-    queryFn: () => fetchScenarioById(id),
-    enabled: !!id,
+    queryKey: ["scenarios", id, token],
+    queryFn: () => fetchScenarioById(id, token!),
+    enabled: !!id && isHydrated && !!token,
   });
 }
