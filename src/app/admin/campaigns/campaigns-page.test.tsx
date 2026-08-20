@@ -82,7 +82,8 @@ const mockAgents = [
     id: "agent-1",
     full_name: "Agent Smith",
     email: "agent@test.com",
-    role: "agent",
+    role: "user",
+    user_type: "agent",
     is_active: true,
   },
 ];

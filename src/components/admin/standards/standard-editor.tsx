@@ -184,13 +184,13 @@ function StandardEditorForm({ campaignId, standard, isAdmin }: StandardEditorPro
     setSelectedBlockId(remaining[Math.min(index, remaining.length - 1)]?.id ?? null);
   };
 
-  const saveDraft = async () => {
+  const saveDraft = async (): Promise<boolean> => {
     setNotice(null);
     const requiredErrors = validateRequiredRubricText(content);
     if (requiredErrors.length > 0) {
       setValidation({ valid: false, weight_total: total, errors: requiredErrors });
       setNotice("Complete all required rubric fields before saving.");
-      return;
+      return false;
     }
     try {
       if (!standard) {
@@ -199,8 +199,10 @@ function StandardEditorForm({ campaignId, standard, isAdmin }: StandardEditorPro
         await updateMutation.mutateAsync({ expected_revision: standard.revision, name: name.trim() || standard.name, description: description || null, draft_content: content });
       }
       setNotice("Draft saved.");
+      return true;
     } catch (error) {
       setNotice(describeServerError(error));
+      return false;
     }
   };
 
@@ -216,6 +218,10 @@ function StandardEditorForm({ campaignId, standard, isAdmin }: StandardEditorPro
 
   const publish = async () => {
     try {
+      // Publish the editor's current values, not only the last saved draft.
+      // The backend validates persisted draft_content, so dirty changes must
+      // be saved before the publish request is sent.
+      if (isDirty && !(await saveDraft())) return;
       const version = await publishMutation.mutateAsync({ publication_note: "Published from the administrator rubric manager." });
       setPublishOpen(false);
       setNotice(`Published version ${version.version_number}.`);

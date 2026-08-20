@@ -613,6 +613,10 @@ export default function SessionResultsPage({
   const reportLearningPlan = reportSections?.learning_plan.state === "loaded"
     ? reportSections.learning_plan.data as LearningPlan
     : null;
+  const canRegenerate = reportState.isError
+    && reportState.metadata.error instanceof SessionArtifactError
+    && (reportState.metadata.error.category === "not_found"
+      || reportState.metadata.error.category === "server");
   const evaluationData = reportEvaluation ?? evaluation.data;
   const transcriptData = reportTranscript ?? transcript.data ?? [];
   const coachingData = reportCoaching ?? coaching.data ?? null;
@@ -647,7 +651,11 @@ export default function SessionResultsPage({
 
   // The aggregate report is authoritative; only fall back to the legacy query when it is unavailable.
   if (useLegacyArtifacts && evaluation.isError) {
-    return <ErrorState title="evaluation" error={evaluation.error} onRetry={() => evaluation.refetch()} />;
+    return <ErrorState
+      title="evaluation"
+      error={evaluation.error}
+      onRetry={canRegenerate ? () => { void regenerateResults(); } : () => evaluation.refetch()}
+    />;
   }
 
   if (!evaluationData) {
