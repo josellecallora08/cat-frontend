@@ -15,6 +15,7 @@ import {
 import { useSessionStore } from "@/stores/session-store";
 import { useScenario } from "@/hooks/use-scenarios";
 import { cn } from "@/lib/utils";
+import { playStreamingMp3 } from "@/lib/streaming-audio";
 import gsap from "gsap";
 import {
   Mic,
@@ -103,6 +104,7 @@ function CallPageContent() {
   const [continuousMode, setContinuousMode] = useState(true);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const ttsAbortRef = useRef<AbortController | null>(null);
   const transcriptEndRef = useRef<HTMLDivElement>(null);
   const messageInFlightRef = useRef(false);
   const listenTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -123,7 +125,10 @@ function CallPageContent() {
         audioRef.current = null;
         resolve();
       };
+      ttsAbortRef.current?.abort();
+      audioRef.current?.pause();
       const controller = new AbortController();
+      ttsAbortRef.current = controller;
       const requestTimeout = setTimeout(() => controller.abort(), 15000);
       try {
         const res = await fetch(`${API_BASE_URL}/api/tts`, {
@@ -134,21 +139,16 @@ function CallPageContent() {
         });
         clearTimeout(requestTimeout);
         if (!res.ok) throw new Error("TTS request failed");
-        const audioBlob = await res.blob();
-        const audioUrl = URL.createObjectURL(audioBlob);
-        const audio = new Audio(audioUrl);
-        audioRef.current = audio;
-        audio.onended = () => {
-          URL.revokeObjectURL(audioUrl);
-          finish();
-        };
-        audio.onerror = () => {
-          URL.revokeObjectURL(audioUrl);
-          finish();
-        };
-        await audio.play();
-      } catch {
+        await playStreamingMp3(res, controller.signal, (audio) => {
+          audioRef.current = audio;
+        });
+        finish();
+      } catch (streamError) {
         clearTimeout(requestTimeout);
+        if (isAbortError(streamError)) {
+          finish();
+          return;
+        }
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.lang = "fil-PH";
         utterance.rate = 0.9;
@@ -253,6 +253,8 @@ function CallPageContent() {
 
         // If debtor is interrupting, play immediately (cut any ongoing audio)
         if (data.interrupt) {
+          ttsAbortRef.current?.abort();
+          audioRef.current?.pause();
           speechSynthesis.cancel(); // Stop any browser TTS
         }
 
@@ -396,6 +398,7 @@ function CallPageContent() {
 
   const endCall = useCallback(async () => {
     stopListening();
+    ttsAbortRef.current?.abort();
     audioRef.current?.pause();
     audioRef.current = null;
     speechSynthesis.cancel();
