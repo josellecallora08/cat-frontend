@@ -8,6 +8,7 @@ export type SessionStatus =
   | "pending"
   | "active"
   | "completed"
+  | "cancelled"
   | "error";
 
 export interface SessionResponse {
@@ -336,6 +337,7 @@ async function requestArtifact<T>(
 export async function createSession(
   scenarioId: string,
   campaignId?: string,
+  creationKey?: string,
 ): Promise<SessionResponse> {
   const token = typeof window !== "undefined" ? localStorage.getItem("cat_token") : null;
   const headers: Record<string, string> = { "Content-Type": "application/json" };
@@ -347,6 +349,7 @@ export async function createSession(
     body: JSON.stringify({
       scenario_id: scenarioId,
       ...(campaignId ? { campaign_id: campaignId } : {}),
+      ...(creationKey ? { creation_key: creationKey } : {}),
     }),
   });
 
@@ -360,6 +363,19 @@ export async function createSession(
   }
 
   return response.json();
+}
+
+export async function cancelSession(sessionId: string): Promise<void> {
+  const token = typeof window !== "undefined" ? localStorage.getItem("cat_token") : null;
+  const headers: Record<string, string> = {};
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const response = await fetch(`${API_BASE_URL}/api/sessions/${sessionId}/cancel`, {
+    method: "POST",
+    headers,
+  });
+  if (!response.ok && response.status !== 409) {
+    throw new Error(`Failed to cancel session: ${response.status}`);
+  }
 }
 
 export async function endSession(sessionId: string): Promise<SessionResponse> {

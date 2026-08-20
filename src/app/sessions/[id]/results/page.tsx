@@ -224,7 +224,7 @@ function MetadataStep({ report }: { report: NormalizedReport | null }) {
       {[
         ["Session ID", report.session_id],
         ["Scenario", value("scenario_name", value("scenario", "Unavailable"))],
-        ["Participant", value("user_name", value("agent_name", "Unavailable"))],
+        ["Participant", value("participant_name", value("user_name", value("agent_name", "Unavailable")))],
         ["Report status", report.report_status],
         ["Score status", report.score_status],
         ["Evaluation", report.evaluation_version.name ?? (report.evaluation_kind === "legacy" ? "Legacy evaluation" : "Current evaluation")],
@@ -641,7 +641,7 @@ export default function SessionResultsPage({
   };
 
   useEffect(() => {
-    stepContentRef.current?.focus();
+    stepContentRef.current?.focus({ preventScroll: true });
   }, [step]);
 
   // Evaluation is the primary artifact; other panels render independently as they arrive.

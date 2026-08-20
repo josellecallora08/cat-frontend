@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ReportShell } from "@/components/results/report-shell";
 import { useAuthStore } from "@/stores/auth-store";
@@ -22,10 +22,12 @@ function section(name: ReportSectionName, state: SectionEnvelope["state"] = "loa
 }
 
 function report(overrides: Partial<NormalizedReport> = {}): NormalizedReport {
+  const sections = Object.fromEntries(names.map((name) => [name, section(name)])) as NormalizedReport["sections"];
+  sections.evaluation.data = { overall_score: 64.75 };
   return {
     session_id: "session-1", session: null, report_status: "complete", score_status: "evaluated",
     evaluation_version: { id: "version-7", number: 7, name: "Published standard", kind: "current" },
-    evaluation_kind: "current", sections: Object.fromEntries(names.map((name) => [name, section(name)])) as NormalizedReport["sections"], correlation_id: null,
+    evaluation_kind: "current", sections, correlation_id: null,
     ...overrides,
   };
 }
@@ -71,14 +73,15 @@ describe("ReportShell report lifecycle", () => {
     expect(screen.getByText("Successful metadata")).toBeInTheDocument();
   });
 
-  it("distinguishes current, legacy, and too-short completion metadata", () => {
-    const { rerender } = render(<ReportShell report={report()} reportError={null} sessionId="session-1" onRetry={vi.fn()}><p /></ReportShell>);
-    expect(screen.getByText("Published standard")).toBeInTheDocument();
-    expect(screen.getByText("7", { selector: "dd" })).toBeInTheDocument();
-
-    const legacy = report({ evaluation_kind: "legacy", evaluation_version: { id: null, number: null, name: null, kind: "legacy" }, report_status: "partial", score_status: "unavailable" });
-    rerender(<ReportShell report={legacy} reportError={null} sessionId="session-1" onRetry={vi.fn()}><p /></ReportShell>);
-    expect(screen.getByText("Legacy evaluation")).toBeInTheDocument();
+  it("shows user, campaign, score, and overall evaluation", () => {
+    const current = report({ session: { participant_name: "Agent Example", campaign_name: "August Campaign" } });
+    const { rerender } = render(<ReportShell report={current} reportError={null} sessionId="session-1" onRetry={vi.fn()}><p /></ReportShell>);
+    expect(screen.getByText("Agent Example")).toBeInTheDocument();
+    expect(screen.getByText("August Campaign")).toBeInTheDocument();
+    expect(screen.getByText("Overall score")).toBeInTheDocument();
+    expect(screen.getByText("64.75 / 100", { selector: "dd" })).toBeInTheDocument();
+    expect(screen.getByText("Needs improvement")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^metadata$/i })).not.toBeInTheDocument();
 
     const short = report({ report_status: "not_applicable", score_status: "not_applicable" });
     rerender(<ReportShell report={short} reportError={null} sessionId="session-1" onRetry={vi.fn()}><p /></ReportShell>);
@@ -101,5 +104,16 @@ describe("ReportShell report lifecycle", () => {
     const updated = report({ sections: { ...initial.sections, coaching: section("coaching", "loaded") } });
     rerender(<ReportShell report={updated} reportError={null} sessionId="session-1" onRetry={vi.fn()} onRetrySection={vi.fn()}><p /></ReportShell>);
     expect(document.activeElement).toBe(exportButton);
+  });
+
+  it("switches sections without hash navigation", async () => {
+    const onSectionSelect = vi.fn();
+    render(<ReportShell report={report()} reportError={null} sessionId="session-1" onRetry={vi.fn()} onSectionSelect={onSectionSelect}><p /></ReportShell>);
+    const user = userEvent.setup();
+
+    await user.click(screen.getAllByRole("button", { name: /transcript/i })[0]);
+
+    expect(onSectionSelect).toHaveBeenCalledWith("transcript");
+    expect(window.location.hash).toBe("");
   });
 });

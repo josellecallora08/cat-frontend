@@ -22,6 +22,17 @@ interface ReportShellProps {
   children: ReactNode;
 }
 
+const NAV_SECTION_NAMES = SECTION_NAMES.filter((name) => name !== "metadata");
+
+function overallEvaluation(score: number | null): string {
+  if (score === null) return "Unavailable";
+  if (score >= 90) return "Excellent";
+  if (score >= 80) return "Very good";
+  if (score >= 70) return "Meets expectations";
+  if (score >= 60) return "Needs improvement";
+  return "Significant improvement needed";
+}
+
 function isAccessFailure(error: Error | null): boolean {
   const candidate = error as Error & { category?: string } | null;
   return candidate?.category === "unauthorized"
@@ -46,10 +57,16 @@ export function ReportShell({ report, reportError, sessionId, onRetry, onRetrySe
 
   const sections = report?.sections;
   const hasFailures = sections && Object.values(sections).some((section) => section.state === "failed");
-  const version = report?.evaluation_version;
   const session = report?.session ?? {};
   const scenario = typeof session.scenario_name === "string" ? session.scenario_name : typeof session.scenario === "string" ? session.scenario : "Scenario unavailable";
-  const participant = typeof session.user_name === "string" ? session.user_name : typeof session.agent_name === "string" ? session.agent_name : typeof session.user === "object" && session.user && "full_name" in session.user && typeof session.user.full_name === "string" ? session.user.full_name : "Participant";
+  const participant = typeof session.participant_name === "string" ? session.participant_name : typeof session.user_name === "string" ? session.user_name : typeof session.agent_name === "string" ? session.agent_name : typeof session.user === "object" && session.user && "full_name" in session.user && typeof session.user.full_name === "string" ? session.user.full_name : "Participant";
+  const campaign = typeof session.campaign_name === "string" ? session.campaign_name : "No campaign";
+  const evaluation = sections?.evaluation.data;
+  const overallScore = evaluation && typeof evaluation === "object" && "overall_score" in evaluation && typeof evaluation.overall_score === "number"
+    ? evaluation.overall_score
+    : evaluation && typeof evaluation === "object" && "weighted_total" in evaluation && typeof evaluation.weighted_total === "number"
+      ? evaluation.weighted_total
+      : null;
 
   return (
     <main aria-labelledby="report-title" className="min-h-screen min-w-0 overflow-x-hidden">
@@ -71,10 +88,10 @@ export function ReportShell({ report, reportError, sessionId, onRetry, onRetrySe
         </header>
         {report && (
           <dl className="grid gap-4 rounded-xl border border-border bg-card p-4 sm:grid-cols-2 lg:grid-cols-4">
-            <div><dt className="text-xs uppercase text-muted-foreground">Report status</dt><dd className="mt-1 text-sm font-medium">{report.report_status}</dd></div>
-            <div><dt className="text-xs uppercase text-muted-foreground">Score status</dt><dd className="mt-1 text-sm font-medium">{report.score_status}</dd></div>
-            <div><dt className="text-xs uppercase text-muted-foreground">Evaluation</dt><dd className="mt-1 text-sm font-medium">{version?.kind === "legacy" ? "Legacy evaluation" : version?.name ?? "Current evaluation"}</dd></div>
-            <div><dt className="text-xs uppercase text-muted-foreground">Version</dt><dd className="mt-1 text-sm font-medium">{version?.number ?? "Unavailable"}</dd></div>
+            <div><dt className="text-xs uppercase text-muted-foreground">Name</dt><dd className="mt-1 text-sm font-medium">{participant}</dd></div>
+            <div><dt className="text-xs uppercase text-muted-foreground">Campaign</dt><dd className="mt-1 text-sm font-medium">{campaign}</dd></div>
+            <div><dt className="text-xs uppercase text-muted-foreground">Overall score</dt><dd className="mt-1 text-sm font-medium">{overallScore === null ? "Unavailable" : `${overallScore} / 100`}</dd></div>
+            <div><dt className="text-xs uppercase text-muted-foreground">Overall evaluation</dt><dd className="mt-1 text-sm font-medium">{overallEvaluation(overallScore)}</dd></div>
           </dl>
         )}
         {report?.report_status === "not_applicable" && (
@@ -87,17 +104,17 @@ export function ReportShell({ report, reportError, sessionId, onRetry, onRetrySe
             <p className="px-3 pb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Report sections</p>
             <nav aria-label="Report sections">
               <ul className="space-y-1">
-                {SECTION_NAMES.map((name) => {
+                {NAV_SECTION_NAMES.map((name) => {
                   const section = sections?.[name];
                   const label = name.replace(/_/g, " ");
                   const state = section?.state;
                   return (
                     <li key={name}>
-                      <a href={`#${name}-heading`} aria-current={activeSection === name ? "page" : undefined} onClick={() => onSectionSelect?.(name)} className={`flex min-h-10 items-center justify-between rounded-lg px-3 text-sm capitalize transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${activeSection === name ? "bg-primary/10 font-semibold text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}>
+                      <button type="button" aria-current={activeSection === name ? "page" : undefined} onClick={() => onSectionSelect?.(name)} className={`flex min-h-10 w-full items-center justify-between rounded-lg px-3 text-sm capitalize transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${activeSection === name ? "bg-primary/10 font-semibold text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}>
                         <span>{label}</span>
                         {state === "loaded" && <CheckCircle2 className="h-4 w-4 text-emerald-600" aria-label="Completed" />}
                         {state === "failed" && <span className="text-xs text-destructive">Retry</span>}
-                      </a>
+                      </button>
                     </li>
                   );
                 })}
@@ -106,10 +123,10 @@ export function ReportShell({ report, reportError, sessionId, onRetry, onRetrySe
           </aside>
           <div className="min-w-0">
             <div className="mb-4 flex gap-2 overflow-x-auto rounded-xl border border-border bg-card p-2 lg:hidden" aria-label="Report sections">
-              {SECTION_NAMES.map((name) => (
-                <a key={name} href={`#${name}-heading`} aria-current={activeSection === name ? "page" : undefined} onClick={() => onSectionSelect?.(name)} className={`min-h-10 shrink-0 rounded-lg px-3 py-2 text-sm capitalize focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${activeSection === name ? "bg-primary/10 font-semibold text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}>
+              {NAV_SECTION_NAMES.map((name) => (
+                <button type="button" key={name} aria-current={activeSection === name ? "page" : undefined} onClick={() => onSectionSelect?.(name)} className={`min-h-10 shrink-0 rounded-lg px-3 py-2 text-sm capitalize focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${activeSection === name ? "bg-primary/10 font-semibold text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}>
                   <span className="inline-flex items-center gap-2">{name.replace(/_/g, " ")}{sections?.[name]?.state === "loaded" && <CheckCircle2 className="h-4 w-4 text-emerald-600" aria-label="Completed" />}</span>
-                </a>
+                </button>
               ))}
             </div>
             <section id="metadata-heading" aria-labelledby="report-title" className="min-w-0">
