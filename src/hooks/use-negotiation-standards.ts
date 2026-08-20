@@ -8,6 +8,7 @@ import {
   fetchNegotiationStandard,
   fetchNegotiationStandardVersions,
   publishNegotiationStandard,
+  reopenNegotiationStandard,
   updateNegotiationStandard,
   validateNegotiationStandard,
 } from "@/lib/api/negotiation-standards";
@@ -99,6 +100,10 @@ export function usePublishNegotiationStandard(campaignId: string) {
 
 export function useArchiveNegotiationStandard(campaignId: string) {
   return useStandardMutation(campaignId, (token) => archiveNegotiationStandard(campaignId, token));
+}
+
+export function useReopenNegotiationStandard(campaignId: string) {
+  return useStandardMutation(campaignId, (token) => reopenNegotiationStandard(campaignId, token));
 }
 
 function useMutationWithPayload<TPayload, TResult>(

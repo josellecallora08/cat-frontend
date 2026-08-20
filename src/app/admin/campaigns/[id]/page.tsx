@@ -30,6 +30,7 @@ import { Select } from "@/components/ui/select";
 import { useCampaign, useUpdateCampaign } from "@/hooks/use-campaigns";
 import { useNegotiationStandard } from "@/hooks/use-negotiation-standards";
 import type { CampaignUpdatePayload } from "@/lib/api/campaigns";
+import type { StandardResponse } from "@/lib/api/negotiation-standards";
 import { useAuthStore } from "@/stores/auth-store";
 
 const STATUS_OPTIONS = [
@@ -41,6 +42,21 @@ const STATUS_OPTIONS = [
 
 function statusBadgeVariant(status: string) {
   if (status === "active") return "success" as const;
+  return "default" as const;
+}
+
+/** Plain-language negotiation-standard readiness sentence (design.md §3.1/§4). */
+function describeStandardReadiness(standard: StandardResponse | null, isLoading: boolean): string {
+  if (isLoading) return "Loading standard…";
+  if (!standard) return "Not started — no standard yet";
+  if (standard.status === "published") return "Ready — sessions can start";
+  const weightTotal = standard.draft_content?.blocks.reduce((sum, block) => sum + block.weight, 0) ?? 0;
+  return `In progress — ${weightTotal}% of 100% weight assigned`;
+}
+
+function standardStatusBadgeVariant(status: StandardResponse["status"] | undefined) {
+  if (status === "published") return "success" as const;
+  if (status === "archived") return "outline" as const;
   return "default" as const;
 }
 
@@ -199,15 +215,8 @@ export default function CampaignDetailPage({
   }
 
   const dateRange = formatDateRange(campaign.start_date, campaign.end_date);
-  const standard = standardQuery.data;
-  const draftWeightTotal = standard?.draft_content?.blocks.reduce((sum, block) => sum + block.weight, 0);
-  const standardReadiness = standard
-    ? standard.status === "published"
-      ? `Published${standard.current_version_number ? ` · v${standard.current_version_number}` : ""}`
-      : `${draftWeightTotal ?? 0}% draft weight`
-    : standardQuery.isLoading
-      ? "Loading standard…"
-      : "Not configured";
+  const standard = standardQuery.data ?? null;
+  const standardReadiness = describeStandardReadiness(standard, standardQuery.isLoading);
 
   return (
     <PageContent>
@@ -233,19 +242,6 @@ export default function CampaignDetailPage({
             >
               {campaign.status}
             </Badge>
-            <div className="flex flex-col items-end gap-1">
-              <Link
-                href={`/admin/campaigns/${id}/standards`}
-                aria-label={`Manage negotiation standards for ${campaign.name}`}
-                className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-border px-3 text-sm font-medium text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
-                Negotiation standards
-              </Link>
-              <span className="text-xs text-muted-foreground" aria-label={`Standard readiness: ${standardReadiness}`}>
-                {standardReadiness}
-              </span>
-            </div>
             <Button
               variant="outline"
               size="sm"
@@ -274,7 +270,7 @@ export default function CampaignDetailPage({
       )}
 
       {/* Dashboard Metrics Cards */}
-      <div className="grid gap-6 grid-cols-1 sm:grid-cols-2">
+      <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
         <Card>
           <CardContent className="flex items-start gap-4 pt-6">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-secondary">
@@ -308,6 +304,38 @@ export default function CampaignDetailPage({
               <p className="mt-0.5 text-2xl font-semibold leading-tight capitalize text-foreground">
                 {campaign.status}
               </p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="flex items-start gap-4 pt-6">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-secondary">
+              <SlidersHorizontal
+                className="h-5 w-5 text-secondary-foreground"
+                aria-hidden="true"
+              />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="text-xs font-medium text-muted-foreground">
+                  Negotiation standard
+                </p>
+                {standard && (
+                  <Badge variant={standardStatusBadgeVariant(standard.status)} className="capitalize">
+                    {standard.status}
+                  </Badge>
+                )}
+              </div>
+              <p className="mt-0.5 text-sm font-semibold leading-tight text-foreground">
+                {standardReadiness}
+              </p>
+              <Link
+                href={`/admin/campaigns/${id}/standards`}
+                aria-label={`Open rubric editor for ${campaign.name}`}
+                className="mt-2 inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-border px-3 text-sm font-medium text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                Open rubric editor
+              </Link>
             </div>
           </CardContent>
         </Card>
@@ -403,5 +431,5 @@ export default function CampaignDetailPage({
   );
 }
 
-export { formatDateRange };
+export { formatDateRange, describeStandardReadiness };
 

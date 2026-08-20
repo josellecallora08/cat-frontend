@@ -41,11 +41,11 @@ describe("rubric result components", () => {
 
     expect(screen.getByText((_, element) => element?.tagName === "P" && element.textContent?.includes("75 × 40% ÷ 100 = 30.00") === true)).toBeInTheDocument();
     expect(screen.getByText("Passing")).toBeInTheDocument();
-    const toggle = screen.getByRole("button", { name: /show transcript evidence/i });
+    const toggle = screen.getByRole("button", { name: /show what was said/i });
     toggle.focus();
     await user.keyboard("{Enter}");
     expect(toggle).toHaveAttribute("aria-expanded", "true");
-    expect(screen.getByText(/sequence 4 · agent/i)).toBeInTheDocument();
+    expect(screen.getByText(/sequence 4 · you/i)).toBeInTheDocument();
     expect(screen.getByText(/i can offer an arrangement/i)).toBeInTheDocument();
     expect(screen.getByRole("article")).toHaveClass("min-w-0");
   });
@@ -87,6 +87,40 @@ describe("rubric result components", () => {
 
 });
 
+
+describe("results-page plain-language copy redesign (TASK-037 37.9)", () => {
+  it("uses 'Show what was said' as the transcript-evidence disclosure label", () => {
+    render(<RubricScoreCard category={category} transcript={[{ sequence_number: 4, speaker: "agent", text: "I can offer an arrangement.", timestamp: "2026-01-01T00:00:00Z" }]} />);
+    expect(screen.getByRole("button", { name: /show what was said \(1\)/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /show transcript evidence/i })).not.toBeInTheDocument();
+  });
+
+  it("maps agent/debtor speaker labels to You/Customer inside evidence", async () => {
+    const user = userEvent.setup();
+    render(<RubricScoreCard category={category} transcript={[{ sequence_number: 4, speaker: "agent", text: "I can offer an arrangement.", timestamp: "2026-01-01T00:00:00Z" }]} />);
+    await user.click(screen.getByRole("button", { name: /show what was said/i }));
+    expect(screen.getByText(/sequence 4 · you/i)).toBeInTheDocument();
+  });
+
+  it("uses 'What to try next time' as the recommendation-panel heading", () => {
+    render(<RecommendationPanel recommendations={[recommendation]} />);
+    expect(screen.getByRole("heading", { name: "What to try next time" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Recommended responses" })).not.toBeInTheDocument();
+  });
+
+  it("keeps grouping-by-block behavior unchanged under the new heading", () => {
+    const recommendations = Array.from({ length: 2 }, (_, index) => ({
+      ...recommendation,
+      rubric_block_id: index === 0 ? "compliance" : "resolution",
+      block_name: index === 0 ? "Compliance" : "Resolution",
+      criterion_id: `criterion-${index}`,
+    }));
+    render(<RecommendationPanel recommendations={recommendations} />);
+    expect(screen.getByRole("heading", { name: "What to try next time" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Compliance" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Resolution" })).toBeInTheDocument();
+  });
+});
 
 describe("recommendation and action boundary exploration", () => {
   const makeRecommendation = (index: number): RubricRecommendation => ({

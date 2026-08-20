@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   transcript: { isLoading: false, isError: false, error: null as Error | null, data: [] as unknown, refetch: vi.fn() },
   coaching: { isLoading: false, isError: false, error: null as Error | null, data: null as unknown, refetch: vi.fn() },
   learningPlan: { isLoading: false, isError: false, error: null as Error | null, data: null as unknown, refetch: vi.fn() },
+  report: { isError: false },
   confetti: vi.fn(),
 }));
 
@@ -17,11 +18,7 @@ vi.mock("react", async () => {
 });
 
 vi.mock("@/hooks/use-report", () => ({
-  useReport: () => ({ report: null, metadata: { error: null }, retryAll: vi.fn(), retrySection: vi.fn() }),
-}));
-
-vi.mock("@/hooks/use-report", () => ({
-  useReport: () => ({ report: null, metadata: { error: null }, retryAll: vi.fn(), retrySection: vi.fn() }),
+  useReport: () => ({ report: null, metadata: { error: null }, isError: mocks.report.isError, retryAll: vi.fn(), retrySection: vi.fn() }),
 }));
 
 vi.mock("@/hooks/use-session-results", () => ({
@@ -115,6 +112,7 @@ function resetMocks() {
   Object.assign(mocks.transcript, { isLoading: false, isError: false, error: null, data: transcript });
   Object.assign(mocks.coaching, { isLoading: false, isError: false, error: null, data: coaching });
   Object.assign(mocks.learningPlan, { isLoading: false, isError: false, error: null, data: learningPlan });
+  mocks.report.isError = false;
   mocks.confetti.mockReset();
 }
 
@@ -170,7 +168,7 @@ describe("TASK-070 results page states and accessibility", () => {
   it("preserves the legacy results presentation", async () => {
     renderPage();
     await waitForResultsHeading();
-    expect(screen.getByText(/legacy session/i)).toBeInTheDocument();
+    expect(screen.getByText(/scored with an earlier system/i)).toBeInTheDocument();
     expect(screen.getByText(/compliance/i)).toBeInTheDocument();
   });
 
@@ -244,6 +242,44 @@ describe("TASK-070 results page states and accessibility", () => {
   });
 });
 
+
+describe("TASK-037 37.9 pinned-version strip and plain-language edge states", () => {
+  it("shows the pinned-version explainer strip with a version badge for an evaluated canonical session", async () => {
+    mocks.evaluation.data = canonicalEvaluation;
+    renderPage();
+    await waitForResultsHeading();
+    expect(screen.getByText("Custom Standard")).toBeInTheDocument();
+    expect(screen.getByText("v4")).toBeInTheDocument();
+    expect(screen.getByText("Pinned at session start")).toBeInTheDocument();
+  });
+
+  it("shows muted legacy copy with no version badge for a legacy session", async () => {
+    renderPage();
+    await waitForResultsHeading();
+    expect(screen.getByText(/scored with an earlier system/i)).toBeInTheDocument();
+    expect(screen.queryByText(/^v\d+$/)).not.toBeInTheDocument();
+    expect(screen.queryByText("Pinned at session start")).not.toBeInTheDocument();
+  });
+
+  it("shows an actionable not_applicable banner with a 'Start a new session' action", async () => {
+    mocks.evaluation.data = notApplicableEvaluation;
+    renderPage();
+    await waitForResultsHeading();
+    expect(
+      screen.getByText(/this usually happens when the call was too short to evaluate fairly/i),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /start a new session/i })).toBeInTheDocument();
+  });
+
+  it("shows a plain-language reason category alongside the retry button on evaluation failure", async () => {
+    mocks.report.isError = true;
+    mocks.evaluation.isError = true;
+    mocks.evaluation.error = new Error("Evaluation timed out");
+    renderPage();
+    await waitFor(() => expect(screen.getByRole("button", { name: /try again/i })).toBeInTheDocument());
+    expect(screen.getByText(/processing timed out/i)).toBeInTheDocument();
+  });
+});
 
 describe("unsafe and partial result-state exploration", () => {
   it("does not expose raw artifact error details", async () => {

@@ -111,6 +111,13 @@ function safeArtifactErrorMessage(title: string, error: Error | null): string {
   return `Unable to load the ${title.toLowerCase()}. Please try again.`;
 }
 
+/** Maps a raw failure to a one-line plain-language reason category (design.md §3.12). */
+function describeFailureReason(error: Error | null): string | null {
+  if (!error?.message) return null;
+  if (/timed out|timeout/i.test(error.message)) return "It looks like processing timed out.";
+  return "Something went wrong on our end.";
+}
+
 function isEvaluationPassing(data: EvaluationResult): boolean {
   if (isEvaluationNotApplicable(data)) return false;
   return data.passed ?? getOverallScore(data) >= getPassingThreshold(data);
@@ -118,12 +125,15 @@ function isEvaluationPassing(data: EvaluationResult): boolean {
 
 function StandardContext({ data }: { data: EvaluationResult }) {
   if (!data.standard_name && !data.standard_version_number) {
-    return <p className="text-xs text-muted-foreground">Legacy session · rubric version unavailable</p>;
+    return <p className="text-xs text-muted-foreground">Scored with an earlier system — some details may be limited.</p>;
   }
   return (
     <div className="flex flex-wrap items-center justify-center gap-2 text-xs text-muted-foreground" aria-label="Pinned negotiation standard">
+      {data.standard_version_number !== null && data.standard_version_number !== undefined && (
+        <span className="rounded-full border border-border bg-background/80 px-2 py-0.5 text-xs font-medium text-foreground">v{data.standard_version_number}</span>
+      )}
       <span className="font-medium text-foreground">{data.standard_name ?? "Negotiation standard"}</span>
-      {data.standard_version_number !== null && data.standard_version_number !== undefined && <span>Version {data.standard_version_number}</span>}
+      <span>Pinned at session start</span>
     </div>
   );
 }
@@ -149,10 +159,21 @@ function CatLoading() {
 function EvaluationStep({ data, transcript }: { data: EvaluationResult; transcript: TranscriptEntry[] }) {
   const canonical = data.rubric_result;
   if (canonical?.status === "not_applicable") {
-    return <div role="status" className="space-y-3 rounded-xl border border-[#F59E0B]/30 bg-[#F59E0B]/5 p-5 text-sm text-muted-foreground"><p>Evaluation not applicable: {canonical.summary}</p></div>;
+    return (
+      <div role="status" className="space-y-3 rounded-xl border border-[#F59E0B]/30 bg-[#F59E0B]/5 p-5 text-sm text-muted-foreground">
+        <p>Evaluation not applicable: {canonical.summary}</p>
+        <p>This usually happens when the call was too short to evaluate fairly. Try a full-length practice session.</p>
+        <Link href="/sessions/new" className="inline-flex min-h-11 items-center rounded-lg border border-border bg-background px-3 text-sm font-medium text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Start a new session</Link>
+      </div>
+    );
   }
   if (canonical?.categories.length) {
-    return <div className="space-y-4">{canonical.categories.map((category) => <RubricScoreCard key={category.rubric_block_id} category={category} transcript={transcript} />)}</div>;
+    return (
+      <div className="space-y-4">
+        <StandardContext data={data} />
+        {canonical.categories.map((category) => <RubricScoreCard key={category.rubric_block_id} category={category} transcript={transcript} />)}
+      </div>
+    );
   }
 
   return (
@@ -552,12 +573,14 @@ function ArtifactLoading({ label }: { label: string }) {
 // --- Error state ---
 function ErrorState({ title, error, onRetry }: { title: string; error: Error | null; onRetry: () => void }) {
   const canRetry = !(error instanceof SessionArtifactError) || error.retryable;
+  const reason = title === "evaluation" ? describeFailureReason(error) : null;
   return (
     <div className="flex min-h-[50vh] items-center justify-center">
       <div className="text-center space-y-4">
         <AlertCircle className="mx-auto h-8 w-8 text-[#EF4444]" />
         <h2 className="text-lg font-medium text-foreground">Couldn&apos;t load {title}</h2>
         <p className="text-sm text-muted-foreground">{safeArtifactErrorMessage(title, error)}</p>
+        {reason && <p className="text-xs text-muted-foreground">{reason}</p>}
         {canRetry && <Button variant="outline" size="sm" className="min-h-11" onClick={onRetry}>Try again</Button>}
       </div>
     </div>

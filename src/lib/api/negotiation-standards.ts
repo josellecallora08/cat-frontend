@@ -140,6 +140,10 @@ export function archiveNegotiationStandard(campaignId: string, token: string): P
   return request(`/api/campaigns/${campaignId}/negotiation-standard/archive`, token, { method: "POST" });
 }
 
+export function reopenNegotiationStandard(campaignId: string, token: string): Promise<StandardResponse> {
+  return request(`/api/campaigns/${campaignId}/negotiation-standard/reopen`, token, { method: "POST" });
+}
+
 export function fetchNegotiationStandardVersions(
   campaignId: string,
   token: string,

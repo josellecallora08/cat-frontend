@@ -47,7 +47,7 @@ export function RecommendationPanel({ recommendations }: RecommendationPanelProp
 
   return (
     <section aria-labelledby={`rubric-recommendations-heading-${instanceId}`} className="min-w-0 space-y-3 rounded-xl border border-border bg-card p-4 [overflow-wrap:anywhere]">
-      <div className="flex min-w-0 items-center gap-2"><Sparkles className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" /><h3 id={`rubric-recommendations-heading-${instanceId}`} className="text-base font-semibold text-foreground">Recommended responses</h3></div>
+      <div className="flex min-w-0 items-center gap-2"><Sparkles className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" /><h3 id={`rubric-recommendations-heading-${instanceId}`} className="text-base font-semibold text-foreground">What to try next time</h3></div>
       <div id={recommendationsRegionId} className="min-w-0 space-y-3" aria-live="polite">
         {grouped.map(([blockId, items]) => {
           const groupId = `recommendation-group-${instanceId}-${domId(blockId)}`;

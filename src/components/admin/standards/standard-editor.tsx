@@ -1,14 +1,15 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Archive, Check, ChevronRight, Loader2, Plus, Save, Send, X } from "lucide-react";
+import { Archive, Check, ChevronRight, Loader2, Pencil, Plus, Save, Send, X } from "lucide-react";
 
 import { PageEmpty } from "@/components/page-empty";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { useArchiveNegotiationStandard, useCreateNegotiationStandard, useDeleteNegotiationStandard, useNegotiationStandardVersions, usePublishNegotiationStandard, useUpdateNegotiationStandard, useValidateNegotiationStandard } from "@/hooks/use-negotiation-standards";
-import type { StandardResponse, ValidationIssue } from "@/lib/api/negotiation-standards";
+import { useArchiveNegotiationStandard, useCreateNegotiationStandard, useDeleteNegotiationStandard, useNegotiationStandardVersions, usePublishNegotiationStandard, useReopenNegotiationStandard, useUpdateNegotiationStandard, useValidateNegotiationStandard } from "@/hooks/use-negotiation-standards";
+import { StandardApiError, type StandardResponse, type ValidationIssue } from "@/lib/api/negotiation-standards";
 import type { NegotiationStandardContent, RubricBlock } from "@/lib/negotiation-standard-types";
+import { LifecycleStepper } from "./lifecycle-stepper";
 import { RubricBlockEditor } from "./rubric-block-editor";
 import { StandardPreview } from "./standard-preview";
 import { VersionHistory } from "./version-history";
@@ -75,6 +76,37 @@ function moveBlock(blocks: RubricBlock[], id: string, direction: "up" | "down") 
   return next.map((block, order) => ({ ...block, display_order: order }));
 }
 
+/** Human-readable server error mapping (design.md §8). Falls back to the raw message. */
+function describeServerError(error: unknown): string {
+  if (error instanceof StandardApiError) {
+    if (error.status === 403) return "You don't have permission to make this change. Contact an administrator.";
+    if (error.status === 404) return "We couldn't find this standard. It may have been removed.";
+    if (error.status === 409) {
+      if (error.detail.code === "stale_revision") return "This draft was updated somewhere else. Reload to see the latest version before saving.";
+      if (error.detail.code === "published_standard_required") return "This campaign doesn't have a published standard yet. Publish one before starting sessions.";
+      return "Published versions can't be changed. Create a new draft instead.";
+    }
+    if (error.status === 422) return "This standard can't be published yet — fix the highlighted issues below.";
+    if (error.status === 503) return "We couldn't generate results right now. Please try again in a moment.";
+    return error.detail.message ?? error.message;
+  }
+  return error instanceof Error ? error.message : "Something went wrong. Please try again.";
+}
+
+/** Groups raw validation issues by rubric block/criterion name instead of showing JSON paths. */
+function describeValidationIssue(issue: ValidationIssue, content: NegotiationStandardContent): { text: string; blockId: string | null } {
+  const match = issue.path.match(/^blocks\.(\d+)(?:\.(positive_behaviors|violations)\.(\d+))?/);
+  if (!match) return { text: issue.message, blockId: null };
+  const block = content.blocks[Number(match[1])];
+  if (!block) return { text: issue.message, blockId: null };
+  if (match[2] && match[3]) {
+    const collection = match[2] === "positive_behaviors" ? block.positive_behaviors : block.violations;
+    const criterion = collection[Number(match[3])];
+    if (criterion) return { text: `${block.category} → ${criterion.name}: ${issue.message}`, blockId: block.id };
+  }
+  return { text: `${block.category}: ${issue.message}`, blockId: block.id };
+}
+
 function StandardEditorForm({ campaignId, standard, isAdmin }: StandardEditorProps) {
   const [name, setName] = useState(standard?.name ?? "");
   const [description, setDescription] = useState(standard?.description ?? "");
@@ -83,6 +115,7 @@ function StandardEditorForm({ campaignId, standard, isAdmin }: StandardEditorPro
   const [notice, setNotice] = useState<string | null>(null);
   const [publishOpen, setPublishOpen] = useState(false);
   const [archiveOpen, setArchiveOpen] = useState(false);
+  const [reopenOpen, setReopenOpen] = useState(false);
   const [selectedVersionId, setSelectedVersionId] = useState<string>();
   const [previewVersion, setPreviewVersion] = useState<StandardResponse["draft_content"]>(null);
   const [secondaryView, setSecondaryView] = useState<"preview" | "history">("preview");
@@ -94,6 +127,7 @@ function StandardEditorForm({ campaignId, standard, isAdmin }: StandardEditorPro
   const validateMutation = useValidateNegotiationStandard(campaignId);
   const publishMutation = usePublishNegotiationStandard(campaignId);
   const archiveMutation = useArchiveNegotiationStandard(campaignId);
+  const reopenMutation = useReopenNegotiationStandard(campaignId);
   const deleteMutation = useDeleteNegotiationStandard(campaignId);
   const versionsQuery = useNegotiationStandardVersions(campaignId);
 
@@ -102,6 +136,19 @@ function StandardEditorForm({ campaignId, standard, isAdmin }: StandardEditorPro
     const firstInvalid = document.querySelector<HTMLElement>("[aria-invalid='true']");
     firstInvalid?.focus();
   }, [validation]);
+
+  const isDirty = name !== (standard?.name ?? "")
+    || description !== (standard?.description ?? "")
+    || JSON.stringify(content) !== JSON.stringify(standard?.draft_content ?? emptyContent);
+
+  useEffect(() => {
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (!isDirty) return;
+      event.preventDefault();
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [isDirty]);
 
   const total = useMemo(() => content.blocks.reduce((sum, block) => sum + (Number.isFinite(block.weight) ? block.weight : 0), 0), [content.blocks]);
   const activeIndex = content.blocks.findIndex((block) => block.id === selectedBlockId);
@@ -118,7 +165,7 @@ function StandardEditorForm({ campaignId, standard, isAdmin }: StandardEditorPro
     }, {});
   }, [activeIndex, validation]);
   const readOnly = !isAdmin || (standard !== null && standard.status !== "draft");
-  const busy = createMutation.isPending || updateMutation.isPending || validateMutation.isPending || publishMutation.isPending || archiveMutation.isPending || deleteMutation.isPending;
+  const busy = createMutation.isPending || updateMutation.isPending || validateMutation.isPending || publishMutation.isPending || archiveMutation.isPending || reopenMutation.isPending || deleteMutation.isPending;
 
   const updateBlock = (block: RubricBlock) => {
     setContent((current) => ({ ...current, blocks: current.blocks.map((item) => item.id === selectedBlockId ? block : item) }));
@@ -155,7 +202,7 @@ function StandardEditorForm({ campaignId, standard, isAdmin }: StandardEditorPro
       }
       setNotice("Draft saved.");
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : "Could not save the draft.");
+      setNotice(describeServerError(error));
     }
   };
 
@@ -165,7 +212,7 @@ function StandardEditorForm({ campaignId, standard, isAdmin }: StandardEditorPro
       setValidation(result);
       setNotice(result.valid ? "Validation passed." : "Validation found issues. The draft can still be saved.");
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : "Could not validate the draft.");
+      setNotice(describeServerError(error));
     }
   };
 
@@ -175,7 +222,7 @@ function StandardEditorForm({ campaignId, standard, isAdmin }: StandardEditorPro
       setPublishOpen(false);
       setNotice(`Published version ${version.version_number}.`);
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : "Could not publish the standard.");
+      setNotice(describeServerError(error));
     }
   };
 
@@ -185,7 +232,18 @@ function StandardEditorForm({ campaignId, standard, isAdmin }: StandardEditorPro
       setArchiveOpen(false);
       setNotice("Standard archived.");
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : "Could not archive the standard.");
+      setNotice(describeServerError(error));
+    }
+  };
+
+  const reopen = async () => {
+    try {
+      await reopenMutation.mutateAsync();
+      setReopenOpen(false);
+      setValidation(null);
+      setNotice("Standard reopened for editing. Save and publish again when you're ready.");
+    } catch (error) {
+      setNotice(describeServerError(error));
     }
   };
 
@@ -227,24 +285,55 @@ function StandardEditorForm({ campaignId, standard, isAdmin }: StandardEditorPro
               </span>
               {standard?.current_version_number && <span className="text-xs text-muted-foreground">Version {standard.current_version_number}</span>}
             </div>
-            <label htmlFor="standard-name" className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Standard name</label>
-            <input id="standard-name" value={name} disabled={readOnly} onChange={(event) => setName(event.target.value)} className="mt-1 min-h-12 w-full rounded-xl border-0 bg-muted/40 px-3 text-xl font-semibold text-foreground outline-none ring-0 placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60 sm:text-2xl" />
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+              <div className="min-w-0 flex-1">
+                <label htmlFor="standard-name" className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Standard name</label>
+                <input id="standard-name" value={name} disabled={readOnly} onChange={(event) => setName(event.target.value)} className="mt-1 min-h-12 w-full rounded-xl border-0 bg-muted/40 px-3 text-xl font-semibold text-foreground outline-none ring-0 placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60 sm:text-2xl" />
+              </div>
+              <div className="w-full sm:w-56 sm:shrink-0 sm:pt-6">
+                <LifecycleStepper status={standard?.status ?? "draft"} validation={validation} />
+              </div>
+            </div>
             <label htmlFor="standard-description" className="mt-3 block text-sm text-muted-foreground">Description</label>
             <textarea id="standard-description" value={description} disabled={readOnly} onChange={(event) => setDescription(event.target.value)} rows={2} className="mt-1 min-h-11 w-full max-w-2xl resize-y rounded-xl border-0 bg-muted/30 px-3 py-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60" placeholder="Describe the outcome this standard should guide." />
           </div>
           <div className="flex flex-wrap gap-2 xl:max-w-md xl:justify-end">
-            <Button variant="outline" className="min-h-11" onClick={saveDraft} disabled={readOnly || busy}><Save className="h-4 w-4" aria-hidden="true" />{updateMutation.isPending || createMutation.isPending ? "Saving…" : "Save draft"}</Button>
+            <Button variant="outline" className="min-h-11" onClick={saveDraft} disabled={readOnly || busy}><Save className="h-4 w-4" aria-hidden="true" />{updateMutation.isPending || createMutation.isPending ? "Saving…" : "Save Draft"}</Button>
             {standard && standard.status === "draft" && <>
-              <Button variant="outline" className="min-h-11" onClick={validateDraft} disabled={busy}><Check className="h-4 w-4" aria-hidden="true" />Validate</Button>
-              <Button className="min-h-11" onClick={() => setPublishOpen(true)} disabled={busy || !validation?.valid}><Send className="h-4 w-4" aria-hidden="true" />Publish</Button>
+              <Button variant="outline" className="min-h-11" onClick={validateDraft} disabled={busy}><Check className="h-4 w-4" aria-hidden="true" />Check Readiness</Button>
+              <Button className="min-h-11" onClick={() => setPublishOpen(true)} disabled={busy || !validation?.valid}><Send className="h-4 w-4" aria-hidden="true" />Publish Standard</Button>
             </>}
-            {standard && standard.status === "published" && <Button variant="destructive" className="min-h-11" onClick={() => setArchiveOpen(true)} disabled={busy}><Archive className="h-4 w-4" aria-hidden="true" />Archive</Button>}
+            {standard && (standard.status === "published" || standard.status === "archived") && <Button variant="outline" className="min-h-11" onClick={() => setReopenOpen(true)} disabled={busy}><Pencil className="h-4 w-4" aria-hidden="true" />Edit this standard</Button>}
+            {standard && standard.status === "published" && <Button variant="destructive" className="min-h-11" onClick={() => setArchiveOpen(true)} disabled={busy}><Archive className="h-4 w-4" aria-hidden="true" />Archive Standard</Button>}
           </div>
         </div>
       </header>
 
       {notice && <div role="status" aria-live="polite" className="rounded-xl border border-border bg-secondary px-4 py-3 text-sm text-secondary-foreground">{notice}</div>}
-      {validation && !validation.valid && <div role="alert" className="rounded-xl border border-destructive/30 bg-destructive/10 p-4"><h2 className="font-semibold text-destructive">Publication validation failed</h2><ul className="mt-2 space-y-1 text-sm text-destructive">{validation.errors.map((error) => <li key={`${error.path}-${error.code}`}>{error.path}: {error.message}</li>)}</ul></div>}
+      {validation && !validation.valid && (
+        <div role="alert" className="rounded-xl border border-destructive/30 bg-destructive/10 p-4">
+          <h2 className="font-semibold text-destructive">This standard can&apos;t be published yet</h2>
+          <ul className="mt-2 space-y-2 text-sm text-destructive">
+            {validation.errors.map((error) => {
+              const described = describeValidationIssue(error, content);
+              return (
+                <li key={`${error.path}-${error.code}`} className="flex flex-wrap items-center justify-between gap-2">
+                  <span>{described.text}</span>
+                  {described.blockId && (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedBlockId(described.blockId)}
+                      className="min-h-11 rounded-lg px-2 text-xs font-medium text-destructive underline hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      Jump to this block
+                    </button>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
 
       <div className="grid gap-5 lg:grid-cols-[15.5rem_minmax(0,1fr)] lg:items-start">
         <aside className="space-y-3 lg:sticky lg:top-4">
@@ -281,11 +370,12 @@ function StandardEditorForm({ campaignId, standard, isAdmin }: StandardEditorPro
       </div>
       <div className="grid gap-5 lg:grid-cols-2">
         <div className={`${secondaryView === "preview" ? "block" : "hidden"} lg:block`}><StandardPreview content={previewVersion ?? content} name={name} versionNumber={previewVersion ? versionsQuery.data?.items.find((version) => version.snapshot === previewVersion)?.version_number : standard?.current_version_number} /></div>
-        <div className={`${secondaryView === "history" ? "block" : "hidden"} lg:block`}><div className="space-y-4"><VersionHistory versions={versionsQuery.data?.items ?? []} selectedVersionId={selectedVersionId} onSelect={selectVersion} />{previewVersion && <Button variant="outline" className="min-h-11" onClick={() => setPreviewVersion(null)}><X className="h-4 w-4" aria-hidden="true" />Close version preview</Button>}</div></div>
+        <div className={`${secondaryView === "history" ? "block" : "hidden"} lg:block`}><div className="space-y-4"><VersionHistory versions={versionsQuery.data?.items ?? []} selectedVersionId={selectedVersionId} currentVersionId={standard?.current_version_id} onSelect={selectVersion} />{previewVersion && <Button variant="outline" className="min-h-11" onClick={() => setPreviewVersion(null)}><X className="h-4 w-4" aria-hidden="true" />Close version preview</Button>}</div></div>
       </div>
 
-      <Dialog open={publishOpen} onOpenChange={setPublishOpen}><DialogContent><DialogHeader><DialogTitle>Publish negotiation standard?</DialogTitle><DialogDescription>This creates an immutable version that future simulations can pin. Review the validation summary before publishing.</DialogDescription></DialogHeader><DialogFooter><DialogClose render={<Button variant="outline" className="min-h-11">Cancel</Button>} /><Button className="min-h-11" onClick={publish} disabled={publishMutation.isPending}>{publishMutation.isPending ? <><Loader2 className="h-4 w-4 motion-reduce:animate-none" aria-hidden="true" />Publishing…</> : "Confirm publish"}</Button></DialogFooter></DialogContent></Dialog>
-      <Dialog open={archiveOpen} onOpenChange={setArchiveOpen}><DialogContent><DialogHeader><DialogTitle>Archive this standard?</DialogTitle><DialogDescription>Archived standards cannot be used to start new simulations. Existing pinned versions remain readable.</DialogDescription></DialogHeader><DialogFooter><DialogClose render={<Button variant="outline" className="min-h-11">Cancel</Button>} /><Button variant="destructive" className="min-h-11" onClick={archive} disabled={archiveMutation.isPending}>{archiveMutation.isPending ? "Archiving…" : "Confirm archive"}</Button></DialogFooter></DialogContent></Dialog>
+      <Dialog open={publishOpen} onOpenChange={setPublishOpen}><DialogContent><DialogHeader><DialogTitle>Publish this standard as version {(standard?.current_version_number ?? 0) + 1}?</DialogTitle><DialogDescription>This creates a permanent snapshot. New sessions will start using version {(standard?.current_version_number ?? 0) + 1} right away. Version {(standard?.current_version_number ?? 0) + 1} cannot be edited or deleted afterward — you can always publish a new version later.</DialogDescription></DialogHeader><DialogFooter><DialogClose render={<Button variant="outline" className="min-h-11">Cancel</Button>} /><Button className="min-h-11" onClick={publish} disabled={publishMutation.isPending}>{publishMutation.isPending ? <><Loader2 className="h-4 w-4 motion-reduce:animate-none" aria-hidden="true" />Publishing…</> : "Confirm & Publish"}</Button></DialogFooter></DialogContent></Dialog>
+      <Dialog open={archiveOpen} onOpenChange={setArchiveOpen}><DialogContent><DialogHeader><DialogTitle>Archive this standard?</DialogTitle><DialogDescription>Archived standards can&apos;t be used to start new simulations until you publish another one. Sessions that already used a published version keep working and keep their original scores.</DialogDescription></DialogHeader><DialogFooter><DialogClose render={<Button variant="outline" className="min-h-11">Cancel</Button>} /><Button variant="destructive" className="min-h-11" onClick={archive} disabled={archiveMutation.isPending}>{archiveMutation.isPending ? "Archiving…" : "Archive"}</Button></DialogFooter></DialogContent></Dialog>
+      <Dialog open={reopenOpen} onOpenChange={setReopenOpen}><DialogContent><DialogHeader><DialogTitle>Edit this standard?</DialogTitle><DialogDescription>This reopens the standard as a draft so you can make changes. The currently published version keeps working exactly as-is for any sessions already using it — your changes only take effect once you publish again.</DialogDescription></DialogHeader><DialogFooter><DialogClose render={<Button variant="outline" className="min-h-11">Cancel</Button>} /><Button className="min-h-11" onClick={reopen} disabled={reopenMutation.isPending}>{reopenMutation.isPending ? "Reopening…" : "Edit this standard"}</Button></DialogFooter></DialogContent></Dialog>
     </div>
   );
 }
