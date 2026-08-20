@@ -31,6 +31,7 @@ import { useCampaign, useUpdateCampaign } from "@/hooks/use-campaigns";
 import { useNegotiationStandard } from "@/hooks/use-negotiation-standards";
 import type { CampaignUpdatePayload } from "@/lib/api/campaigns";
 import type { StandardResponse } from "@/lib/api/negotiation-standards";
+import { filterSelectableAgents } from "@/lib/api/users";
 import { useAuthStore } from "@/stores/auth-store";
 
 const STATUS_OPTIONS = [
@@ -112,6 +113,9 @@ export default function CampaignDetailPage({
 
   const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
 
+  // The backend only accepts active, role="user"/user_type="agent" users when
+  // saving a campaign, so filter out trainers, admins, and inactive users here
+  // to avoid a 422 on save.
   const { data: allAgents } = useQuery<AgentOption[]>({
     queryKey: ["admin-users"],
     queryFn: async () => {
@@ -119,7 +123,7 @@ export default function CampaignDetailPage({
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) return [];
-      return res.json();
+      return filterSelectableAgents(await res.json());
     },
     enabled: !!token && showEditDialog,
   });

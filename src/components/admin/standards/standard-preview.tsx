@@ -1,4 +1,3 @@
-import { Badge } from "@/components/ui/badge";
 import type { NegotiationStandardContent } from "@/lib/negotiation-standard-types";
 
 interface StandardPreviewProps {
@@ -10,8 +9,7 @@ interface StandardPreviewProps {
 export function StandardPreview({ content, name, versionNumber }: StandardPreviewProps) {
   const blocks = [...content.blocks].sort((a, b) => a.display_order - b.display_order);
   return (
-    <section aria-labelledby="standard-preview-heading" className="rounded-xl border border-border bg-card p-4 sm:p-6">
-      <Badge variant="outline" className="mb-3">Preview — no AI used</Badge>
+    <section aria-labelledby="standard-preview-heading" className="rounded-xl border border-card-border bg-card p-4 sm:p-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div><h2 id="standard-preview-heading" className="text-lg font-semibold text-foreground">{name || "Untitled standard"}</h2><p className="mt-1 text-sm text-muted-foreground">Trainee-facing rubric preview</p></div>
         {versionNumber && <span className="rounded-full bg-secondary px-3 py-1 text-xs font-medium text-secondary-foreground">Version {versionNumber}</span>}

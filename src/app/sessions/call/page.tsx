@@ -50,6 +50,11 @@ function isAbortError(error: unknown): boolean {
   return error instanceof DOMException && error.name === "AbortError";
 }
 
+function getAuthHeaders(): Record<string, string> {
+  const token = typeof window !== "undefined" ? localStorage.getItem("cat_token") : null;
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 // Status visuals map onto existing palette tokens only, always with a label.
 const statusConfig: Record<CallStatus, { label: string; dot: string; pulse: boolean }> = {
   idle: { label: "Ready", dot: "bg-muted-foreground", pulse: false },
@@ -176,7 +181,10 @@ function CallPageContent() {
       await new Promise((r) => setTimeout(r, 500));
       try {
         // First check if session is still valid
-        const checkRes = await fetch(`${API_BASE_URL}/api/sessions/${sessionId}`, { signal: controller.signal });
+        const checkRes = await fetch(`${API_BASE_URL}/api/sessions/${sessionId}`, {
+          headers: getAuthHeaders(),
+          signal: controller.signal,
+        });
         if (checkRes.ok) {
           const sessionData = await checkRes.json();
           if (sessionData.status === "completed" || sessionData.status === "error") {
@@ -192,7 +200,7 @@ function CallPageContent() {
 
         const res = await fetch(`${API_BASE_URL}/api/sessions/${sessionId}/message`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", ...getAuthHeaders() },
           signal: controller.signal,
           body: JSON.stringify({
             text: "[The phone is ringing. You pick up the call.]",
@@ -234,7 +242,7 @@ function CallPageContent() {
         const requestTimeout = setTimeout(() => controller.abort(), 30000);
         const res = await fetch(`${API_BASE_URL}/api/sessions/${sessionId}/message`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", ...getAuthHeaders() },
           signal: controller.signal,
           body: JSON.stringify({ text }),
         });
@@ -258,7 +266,10 @@ function CallPageContent() {
           ]);
           setStatus("ended");
           try {
-            await fetch(`${API_BASE_URL}/api/sessions/${sessionId}/end`, { method: "POST" });
+            await fetch(`${API_BASE_URL}/api/sessions/${sessionId}/end`, {
+              method: "POST",
+              headers: getAuthHeaders(),
+            });
           } catch {
             /* best-effort */
           }
@@ -391,7 +402,10 @@ function CallPageContent() {
     setStatus("ended");
     if (sessionId) {
       try {
-        await fetch(`${API_BASE_URL}/api/sessions/${sessionId}/end`, { method: "POST" });
+        await fetch(`${API_BASE_URL}/api/sessions/${sessionId}/end`, {
+          method: "POST",
+          headers: getAuthHeaders(),
+        });
       } catch {
         /* best-effort */
       }

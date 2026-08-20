@@ -22,7 +22,7 @@ export function WeightSummary({ total, errorCount = 0 }: WeightSummaryProps) {
   return (
     <section
       aria-labelledby="weight-summary-heading"
-      className="rounded-xl border border-border bg-card p-4"
+      className="rounded-xl border border-card-border bg-card p-4"
     >
       <div className="flex items-start justify-between gap-3">
         <div>

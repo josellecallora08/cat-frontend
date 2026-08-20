@@ -34,7 +34,10 @@ export default function RootLayout({
       lang="en"
       className={`${nunito.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col font-sans">
+      <body
+        className="min-h-full flex flex-col font-sans"
+        suppressHydrationWarning
+      >
         <AppProviders>
           <AuthGuard>
             <AppShell>{children}</AppShell>

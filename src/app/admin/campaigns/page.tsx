@@ -7,6 +7,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import type { AgentOption, AgentWithRole } from "@/components/agent-dropdown";
 import { AgentDropdown } from "@/components/agent-dropdown";
+import { filterSelectableAgents } from "@/lib/api/users";
 import { FilterTabs } from "@/components/filter-tabs";
 import { PageContent } from "@/components/page-content";
 import { PageEmpty } from "@/components/page-empty";
@@ -115,7 +116,9 @@ export default function AdminCampaignsPage() {
   // Fetch campaign detail for edit mode
   const { data: campaignDetail } = useCampaign(editingId ?? "");
 
-  // Fetch all agents for the dropdown
+  // Fetch all agents for the dropdown. The backend only accepts active,
+  // role="user"/user_type="agent" users when saving a campaign, so filter
+  // out trainers, admins, and inactive users here to avoid a 422 on save.
   const { data: agents } = useQuery<AgentOption[]>({
     queryKey: ["admin-users"],
     queryFn: async () => {
@@ -123,7 +126,7 @@ export default function AdminCampaignsPage() {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) return [];
-      return res.json();
+      return filterSelectableAgents(await res.json());
     },
     enabled: !!token,
   });

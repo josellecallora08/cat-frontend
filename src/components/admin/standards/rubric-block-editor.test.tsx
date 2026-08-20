@@ -1,4 +1,5 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
 import { RubricBlockEditor } from "./rubric-block-editor";
@@ -44,23 +45,34 @@ function renderEditor(block: RubricBlock = makeBlock()) {
   );
 }
 
+describe("RubricBlockEditor Stable ID (read-only, hidden behind a disclosure)", () => {
+  it("does not render an editable block-level Stable ID input", () => {
+    const block = makeBlock();
+    renderEditor(block);
+
+    expect(screen.queryByDisplayValue(block.id)).not.toBeInTheDocument();
+  });
+
+  it("does not render editable per-criterion Stable ID inputs", () => {
+    const block = makeBlock();
+    renderEditor(block);
+
+    expect(screen.queryByDisplayValue(block.positive_behaviors[0]!.id)).not.toBeInTheDocument();
+    expect(screen.queryByDisplayValue(block.violations[0]!.id)).not.toBeInTheDocument();
+  });
+
+  it("reveals the block's read-only Stable ID after clicking 'Show stable ID'", async () => {
+    const user = userEvent.setup();
+    const block = makeBlock();
+    renderEditor(block);
+
+    const toggles = screen.getAllByRole("button", { name: /show stable id/i });
+    await user.click(toggles[0]!);
+    expect(screen.getByText(block.id)).toBeInTheDocument();
+  });
+});
+
 describe("RubricBlockEditor field visibility (no Advanced settings, no numbered steps)", () => {
-  it("shows the block-level Stable ID field inline, without any disclosure to expand", () => {
-    const block = makeBlock();
-    renderEditor(block);
-
-    expect(screen.getByDisplayValue(block.id)).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /advanced settings/i })).not.toBeInTheDocument();
-  });
-
-  it("shows each per-criterion Stable ID field inline, without any disclosure to expand", () => {
-    const block = makeBlock();
-    renderEditor(block);
-
-    expect(screen.getByDisplayValue(block.positive_behaviors[0]!.id)).toBeInTheDocument();
-    expect(screen.getByDisplayValue(block.violations[0]!.id)).toBeInTheDocument();
-  });
-
   it("does not render numbered step badges or step titles", () => {
     renderEditor();
 
@@ -94,13 +106,12 @@ function matchesLabelWithRequiredMark(label: string) {
 }
 
 describe("RubricBlockEditor required-field indicators", () => {
-  it("marks Category, Weight, Passing score, Stable ID, and Scoring instructions as required", () => {
+  it("marks Category, Weight, Passing score, and Scoring instructions as required", () => {
     renderEditor();
 
     expect(screen.getByText(matchesLabelWithRequiredMark("Category"))).toBeInTheDocument();
     expect(screen.getByText(matchesLabelWithRequiredMark("Weight (%)"))).toBeInTheDocument();
     expect(screen.getByText(matchesLabelWithRequiredMark("Passing score"))).toBeInTheDocument();
-    expect(screen.getAllByText(matchesLabelWithRequiredMark("Stable ID")).length).toBeGreaterThan(0);
     expect(screen.getByText(matchesLabelWithRequiredMark("Scoring instructions"))).toBeInTheDocument();
   });
 

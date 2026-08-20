@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Archive, Check, ChevronRight, Loader2, Pencil, Plus, Save, Send, X } from "lucide-react";
+import { Archive, Check, ChevronDown, ChevronRight, ChevronUp, Loader2, Pencil, Plus, Save, Send, X } from "lucide-react";
 
 import { PageEmpty } from "@/components/page-empty";
 import { Button } from "@/components/ui/button";
@@ -9,7 +9,6 @@ import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, Di
 import { useArchiveNegotiationStandard, useCreateNegotiationStandard, useDeleteNegotiationStandard, useNegotiationStandardVersions, usePublishNegotiationStandard, useReopenNegotiationStandard, useUpdateNegotiationStandard, useValidateNegotiationStandard } from "@/hooks/use-negotiation-standards";
 import { StandardApiError, type StandardResponse, type ValidationIssue } from "@/lib/api/negotiation-standards";
 import type { NegotiationStandardContent, RubricBlock } from "@/lib/negotiation-standard-types";
-import { LifecycleStepper } from "./lifecycle-stepper";
 import { RubricBlockEditor } from "./rubric-block-editor";
 import { StandardPreview } from "./standard-preview";
 import { VersionHistory } from "./version-history";
@@ -46,7 +45,6 @@ function validateRequiredRubricText(content: NegotiationStandardContent): Valida
 
   content.blocks.forEach((block, blockIndex) => {
     const blockPath = `blocks.${blockIndex}`;
-    requireText(block.id, `${blockPath}.id`, "Stable ID");
     requireText(block.category, `${blockPath}.category`, "Category");
     requireText(block.scoring_instructions, `${blockPath}.scoring_instructions`, "Scoring instructions");
     requireText(block.recommendation_guidance, `${blockPath}.recommendation_guidance`, "Recommendation guidance");
@@ -57,7 +55,6 @@ function validateRequiredRubricText(content: NegotiationStandardContent): Valida
     ]) {
       items.forEach((criterion, criterionIndex) => {
         const criterionPath = `${blockPath}.${collection}.${criterionIndex}`;
-        requireText(criterion.id, `${criterionPath}.id`, `${label} stable ID`);
         requireText(criterion.name, `${criterionPath}.name`, `${label} name`);
         requireText(criterion.description, `${criterionPath}.description`, `${label} description`);
         requireText(criterion.evidence_instructions, `${criterionPath}.evidence_instructions`, `${label} evidence instructions`);
@@ -119,6 +116,7 @@ function StandardEditorForm({ campaignId, standard, isAdmin }: StandardEditorPro
   const [selectedVersionId, setSelectedVersionId] = useState<string>();
   const [previewVersion, setPreviewVersion] = useState<StandardResponse["draft_content"]>(null);
   const [secondaryView, setSecondaryView] = useState<"preview" | "history">("preview");
+  const [previewCardsOpen, setPreviewCardsOpen] = useState(false);
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(standard?.draft_content?.blocks[0]?.id ?? null);
   const [blockNumbers, setBlockNumbers] = useState<Record<string, number>>(() => Object.fromEntries((standard?.draft_content?.blocks ?? []).map((block, index) => [block.id, index + 1])));
 
@@ -186,13 +184,13 @@ function StandardEditorForm({ campaignId, standard, isAdmin }: StandardEditorPro
     setSelectedBlockId(remaining[Math.min(index, remaining.length - 1)]?.id ?? null);
   };
 
-  const saveDraft = async () => {
+  const saveDraft = async (): Promise<boolean> => {
     setNotice(null);
     const requiredErrors = validateRequiredRubricText(content);
     if (requiredErrors.length > 0) {
       setValidation({ valid: false, weight_total: total, errors: requiredErrors });
       setNotice("Complete all required rubric fields before saving.");
-      return;
+      return false;
     }
     try {
       if (!standard) {
@@ -201,8 +199,10 @@ function StandardEditorForm({ campaignId, standard, isAdmin }: StandardEditorPro
         await updateMutation.mutateAsync({ expected_revision: standard.revision, name: name.trim() || standard.name, description: description || null, draft_content: content });
       }
       setNotice("Draft saved.");
+      return true;
     } catch (error) {
       setNotice(describeServerError(error));
+      return false;
     }
   };
 
@@ -218,6 +218,10 @@ function StandardEditorForm({ campaignId, standard, isAdmin }: StandardEditorPro
 
   const publish = async () => {
     try {
+      // Publish the editor's current values, not only the last saved draft.
+      // The backend validates persisted draft_content, so dirty changes must
+      // be saved before the publish request is sent.
+      if (isDirty && !(await saveDraft())) return;
       const version = await publishMutation.mutateAsync({ publication_note: "Published from the administrator rubric manager." });
       setPublishOpen(false);
       setNotice(`Published version ${version.version_number}.`);
@@ -276,7 +280,7 @@ function StandardEditorForm({ campaignId, standard, isAdmin }: StandardEditorPro
 
   return (
     <div className="space-y-5 overflow-x-hidden">
-      <header className="rounded-2xl border border-border/70 bg-card p-5 shadow-sm sm:p-6">
+      <header className="rounded-2xl border border-card-border bg-card p-5 shadow-sm sm:p-6">
         <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
           <div className="min-w-0 flex-1">
             <div className="mb-3 flex flex-wrap items-center gap-2">
@@ -285,14 +289,9 @@ function StandardEditorForm({ campaignId, standard, isAdmin }: StandardEditorPro
               </span>
               {standard?.current_version_number && <span className="text-xs text-muted-foreground">Version {standard.current_version_number}</span>}
             </div>
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
-              <div className="min-w-0 flex-1">
-                <label htmlFor="standard-name" className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Standard name</label>
-                <input id="standard-name" value={name} disabled={readOnly} onChange={(event) => setName(event.target.value)} className="mt-1 min-h-12 w-full rounded-xl border-0 bg-muted/40 px-3 text-xl font-semibold text-foreground outline-none ring-0 placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60 sm:text-2xl" />
-              </div>
-              <div className="w-full sm:w-56 sm:shrink-0 sm:pt-6">
-                <LifecycleStepper status={standard?.status ?? "draft"} validation={validation} />
-              </div>
+            <div className="min-w-0 flex-1">
+              <label htmlFor="standard-name" className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Standard name</label>
+              <input id="standard-name" value={name} disabled={readOnly} onChange={(event) => setName(event.target.value)} className="mt-1 min-h-12 w-full rounded-xl border-0 bg-muted/40 px-3 text-xl font-semibold text-foreground outline-none ring-0 placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60 sm:text-2xl" />
             </div>
             <label htmlFor="standard-description" className="mt-3 block text-sm text-muted-foreground">Description</label>
             <textarea id="standard-description" value={description} disabled={readOnly} onChange={(event) => setDescription(event.target.value)} rows={2} className="mt-1 min-h-11 w-full max-w-2xl resize-y rounded-xl border-0 bg-muted/30 px-3 py-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60" placeholder="Describe the outcome this standard should guide." />
@@ -338,7 +337,7 @@ function StandardEditorForm({ campaignId, standard, isAdmin }: StandardEditorPro
       <div className="grid gap-5 lg:grid-cols-[15.5rem_minmax(0,1fr)] lg:items-start">
         <aside className="space-y-3 lg:sticky lg:top-4">
           <WeightSummary total={validation?.weight_total ?? total} errorCount={validation?.errors.length ?? 0} />
-          <section className="rounded-2xl border border-border/70 bg-card p-2 shadow-sm" aria-labelledby="rubric-blocks-heading">
+          <section className="rounded-2xl border border-card-border bg-card p-2 shadow-sm" aria-labelledby="rubric-blocks-heading">
             <div className="flex items-center justify-between gap-2 px-2 py-2">
               <div>
                 <h2 id="rubric-blocks-heading" className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Rubric blocks</h2>
@@ -364,14 +363,30 @@ function StandardEditorForm({ campaignId, standard, isAdmin }: StandardEditorPro
         </section>
       </div>
 
-      <div className="hidden sm:flex lg:hidden" role="tablist" aria-label="Preview and version history">
-        <button type="button" role="tab" aria-selected={secondaryView === "preview"} onClick={() => setSecondaryView("preview")} className="min-h-11 flex-1 rounded-xl px-3 text-sm font-medium text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Preview</button>
-        <button type="button" role="tab" aria-selected={secondaryView === "history"} onClick={() => setSecondaryView("history")} className="min-h-11 flex-1 rounded-xl px-3 text-sm font-medium text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Version history</button>
-      </div>
-      <div className="grid gap-5 lg:grid-cols-2">
-        <div className={`${secondaryView === "preview" ? "block" : "hidden"} lg:block`}><StandardPreview content={previewVersion ?? content} name={name} versionNumber={previewVersion ? versionsQuery.data?.items.find((version) => version.snapshot === previewVersion)?.version_number : standard?.current_version_number} /></div>
-        <div className={`${secondaryView === "history" ? "block" : "hidden"} lg:block`}><div className="space-y-4"><VersionHistory versions={versionsQuery.data?.items ?? []} selectedVersionId={selectedVersionId} currentVersionId={standard?.current_version_id} onSelect={selectVersion} />{previewVersion && <Button variant="outline" className="min-h-11" onClick={() => setPreviewVersion(null)}><X className="h-4 w-4" aria-hidden="true" />Close version preview</Button>}</div></div>
-      </div>
+      <Button
+        type="button"
+        variant="outline"
+        className="min-h-11"
+        onClick={() => setPreviewCardsOpen((current) => !current)}
+        aria-expanded={previewCardsOpen}
+        aria-controls="preview-and-history-region"
+      >
+        {previewCardsOpen ? <ChevronUp className="h-4 w-4" aria-hidden="true" /> : <ChevronDown className="h-4 w-4" aria-hidden="true" />}
+        {previewCardsOpen ? "Hide preview & version history" : "Show preview & version history"}
+      </Button>
+
+      {previewCardsOpen && (
+        <div id="preview-and-history-region">
+          <div className="hidden sm:flex lg:hidden" role="tablist" aria-label="Preview and version history">
+            <button type="button" role="tab" aria-selected={secondaryView === "preview"} onClick={() => setSecondaryView("preview")} className="min-h-11 flex-1 rounded-xl px-3 text-sm font-medium text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Preview</button>
+            <button type="button" role="tab" aria-selected={secondaryView === "history"} onClick={() => setSecondaryView("history")} className="min-h-11 flex-1 rounded-xl px-3 text-sm font-medium text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Version history</button>
+          </div>
+          <div className="grid gap-5 lg:grid-cols-2">
+            <div className={`${secondaryView === "preview" ? "block" : "hidden"} lg:block`}><StandardPreview content={previewVersion ?? content} name={name} versionNumber={previewVersion ? versionsQuery.data?.items.find((version) => version.snapshot === previewVersion)?.version_number : standard?.current_version_number} /></div>
+            <div className={`${secondaryView === "history" ? "block" : "hidden"} lg:block`}><div className="space-y-4"><VersionHistory versions={versionsQuery.data?.items ?? []} selectedVersionId={selectedVersionId} currentVersionId={standard?.current_version_id} onSelect={selectVersion} />{previewVersion && <Button variant="outline" className="min-h-11" onClick={() => setPreviewVersion(null)}><X className="h-4 w-4" aria-hidden="true" />Close version preview</Button>}</div></div>
+          </div>
+        </div>
+      )}
 
       <Dialog open={publishOpen} onOpenChange={setPublishOpen}><DialogContent><DialogHeader><DialogTitle>Publish this standard as version {(standard?.current_version_number ?? 0) + 1}?</DialogTitle><DialogDescription>This creates a permanent snapshot. New sessions will start using version {(standard?.current_version_number ?? 0) + 1} right away. Version {(standard?.current_version_number ?? 0) + 1} cannot be edited or deleted afterward — you can always publish a new version later.</DialogDescription></DialogHeader><DialogFooter><DialogClose render={<Button variant="outline" className="min-h-11">Cancel</Button>} /><Button className="min-h-11" onClick={publish} disabled={publishMutation.isPending}>{publishMutation.isPending ? <><Loader2 className="h-4 w-4 motion-reduce:animate-none" aria-hidden="true" />Publishing…</> : "Confirm & Publish"}</Button></DialogFooter></DialogContent></Dialog>
       <Dialog open={archiveOpen} onOpenChange={setArchiveOpen}><DialogContent><DialogHeader><DialogTitle>Archive this standard?</DialogTitle><DialogDescription>Archived standards can&apos;t be used to start new simulations until you publish another one. Sessions that already used a published version keep working and keep their original scores.</DialogDescription></DialogHeader><DialogFooter><DialogClose render={<Button variant="outline" className="min-h-11">Cancel</Button>} /><Button variant="destructive" className="min-h-11" onClick={archive} disabled={archiveMutation.isPending}>{archiveMutation.isPending ? "Archiving…" : "Archive"}</Button></DialogFooter></DialogContent></Dialog>
